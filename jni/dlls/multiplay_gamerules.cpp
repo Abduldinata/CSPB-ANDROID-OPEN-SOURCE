@@ -1725,6 +1725,22 @@ void CHalfLifeMultiplay::CheckMapConditions()
 		m_iMapHasVIPSafetyZone = MAP_HAVE_VIP_SAFETYZONE_NO;
 }
 
+int CHalfLifeMultiplay::GetMaxOpponentFrags(int myTeam)
+{
+	int maxFrags = 0;
+	for (int i = 1; i <= gpGlobals->maxClients; i++)
+	{
+		CBasePlayer *pPlayer = (CBasePlayer *)UTIL_PlayerByIndex(i);
+		if (pPlayer && !FNullEnt(pPlayer->edict()) && pPlayer->m_iTeam != myTeam && pPlayer->m_iTeam != TEAM_UNASSIGNED && pPlayer->m_iTeam != TEAM_SPECTATOR)
+		{
+			if (pPlayer->pev->frags > maxFrags)
+				maxFrags = (int)pPlayer->pev->frags;
+		}
+	}
+	return maxFrags;
+}
+
+
 
 void CHalfLifeMultiplay::RestartRound()
 {
@@ -3611,7 +3627,7 @@ BOOL CHalfLifeMultiplay::FPlayerCanRespawn(CBasePlayer *pPlayer)
 
 pPlayer->SetProgressBarTime(4);
 
-pPlayer->pev->round_frags = 0;
+pPlayer->round_frags = 0;
 RemoveGuns();
 
 	// Player cannot respawn until next round if more than 20 seconds in
@@ -3705,6 +3721,26 @@ void CHalfLifeMultiplay::PlayerKilled(CBasePlayer *pVictim, entvars_t *pKiller, 
 	else if (peKiller && peKiller->IsPlayer())
 	{
 		// if a player dies in a deathmatch game and the killer is a client, award the killer some points
+
+		// Assist: last damager within 10 seconds (excluding killer).
+		{
+			const float kAssistWindowSeconds = 10.0f;
+			const int assisterIndex = pVictim->m_iLastAssistAttacker;
+			if (assisterIndex > 0 && assisterIndex <= (int)gpGlobals->maxClients)
+			{
+				auto *pAssister = static_cast<CBasePlayer *>(UTIL_PlayerByIndex(assisterIndex));
+				if (pAssister && pAssister->IsPlayer() && pAssister != peKiller &&
+					(pAssister->m_iTeam == peKiller->m_iTeam) && (pAssister->m_iTeam != pVictim->m_iTeam) &&
+					(gpGlobals->time - pVictim->m_flLastAssistTime) <= kAssistWindowSeconds)
+				{
+					// Use a client command instead of a new usermessage to avoid hitting MAX_USER_MESSAGES.
+					CLIENT_COMMAND(pAssister->edict(), "assist\n");
+				}
+			}
+
+			pVictim->m_iLastAssistAttacker = 0;
+			pVictim->m_flLastAssistTime = 0.0f;
+		}
 		CBasePlayer *killer = GetClassPtr<CBasePlayer>(pKiller);
 		bool killedByFFA = false;
 
@@ -3764,257 +3800,103 @@ pKiller->frags += IPointsForKill(peKiller, pVictim);
 
 //MESSAGE_BEGIN(MSG_ONE, gmsgAdd_point, NULL, pKiller); MESSAGE_END(); 
 
-if (pVictim->m_bHeadshotKilled)
-pKiller->round_frags_sniper += 1;
-else
-pKiller->round_frags_sniper += 1;//for stars
+		// --- CSPB V20 MODULAR KILL EFFECTS ---
+		peKiller->round_frags++; 
+		if (pVictim->m_bHeadshotKilled) peKiller->round_frags_headshot++;
+		
+		bool bSpecialTriggered = false;
 
+		// 1. One Shot One Kill Detection
+		if (peKiller->m_bFirstShotAfterRespawn)
+		{
+			MESSAGE_BEGIN(MSG_ONE, gmsgoneShot, NULL, pKiller);
+			MESSAGE_END();
+			bSpecialTriggered = true;
+		}
 
-if (pKiller->round_frags_sniper ==1)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgPos1, NULL, pKiller); MESSAGE_END(); //starpos 2
+		// 2. Special Gunner (Secondary Weapon)
+		if (peKiller->m_pActiveItem)
+		{
+			int wid = peKiller->m_pActiveItem->m_iId;
+			if (wid == WEAPON_P228 || wid == WEAPON_ELITE || wid == WEAPON_FIVESEVEN || 
+				wid == WEAPON_USP || wid == WEAPON_GLOCK18 || wid == WEAPON_DEAGLE)
+			{
+				MESSAGE_BEGIN(MSG_ONE, gmsgSpecialGunner, NULL, pKiller);
+				MESSAGE_END();
+				bSpecialTriggered = true;
+			}
+		}
 
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar1, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
+		// 3. Bomb Shot (Explosive)
+		if (pInflictor && Q_strcmp(STRING(pInflictor->classname), "grenade") == 0)
+		{
+			MESSAGE_BEGIN(MSG_ONE, gmsgBombShot, NULL, pKiller);
+			MESSAGE_END();
+			bSpecialTriggered = true;
+		}
 
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar1, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgPointkill, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar1, NULL, pKiller); MESSAGE_END(); 
-} 
+		// 4. Lead Milestones (Hot Killer / Nightmare)
+		int maxOppFrags = GetMaxOpponentFrags(peKiller->m_iTeam);
+		int myFrags = (int)pKiller->frags;
+		int lead = myFrags - maxOppFrags;
 
-}
-}
+		if (lead >= 7)
+		{
+			MESSAGE_BEGIN(MSG_ONE, gmsgMassKill, NULL, pKiller);
+			MESSAGE_END();
+			MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimBlue, NULL, pKiller);
+			MESSAGE_END();
+			bSpecialTriggered = true;
+		}
+		else if (lead == 6)
+		{
+			MESSAGE_BEGIN(MSG_ONE, gmsgNightmare, NULL, pKiller);
+			MESSAGE_END();
+			MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimBlue, NULL, pKiller);
+			MESSAGE_END();
+			bSpecialTriggered = true;
+		}
+		else if (lead == 5)
+		{
+			MESSAGE_BEGIN(MSG_ONE, gmsgHotKiller, NULL, pKiller);
+			MESSAGE_END();
+			MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimGold, NULL, pKiller);
+			MESSAGE_END();
+			bSpecialTriggered = true;
+		}
 
-
-if (pKiller->round_frags_sniper == 2)
-{
-
-MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1
-
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar2, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
-
-
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar2, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgDoublekill, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar2, NULL, pKiller); MESSAGE_END(); 
-} 
-
-}
-} 
-
-if (pKiller->round_frags_sniper == 3)
-{
-
-MESSAGE_BEGIN(MSG_ONE, gmsgPos1, NULL, pKiller); MESSAGE_END(); //starpos 2
-
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar3, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
-
-
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar3, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgTriplekill, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar3, NULL, pKiller); MESSAGE_END(); 
-} 
-}
-} 
-
-if (pKiller->round_frags_sniper ==4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
-
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar4, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
-
-
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar4, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgChainkiller, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar4, NULL, pKiller); MESSAGE_END(); 
-} 
-}
-} 
-
-if (pKiller->round_frags_sniper ==5)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgPos1, NULL, pKiller); MESSAGE_END(); //starpos 2
-
-switch (RANDOM_LONG(1, 2))
-{
-case 1:
-MESSAGE_BEGIN(MSG_ONE, gmsgHotKiller, NULL, pKiller);
-MESSAGE_END();
-break;
-
-case 2:
-MESSAGE_BEGIN(MSG_ONE, gmsgNightmare, NULL, pKiller);
-MESSAGE_END();
-break;
-}
-
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimBlue, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgBlueStar5, NULL, pKiller);
-MESSAGE_END();
-
-
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar5, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
-
-
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar5, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgChainkiller, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar5, NULL, pKiller); MESSAGE_END(); 
-} 
-}
-} 
-
-if (pKiller->round_frags_sniper ==6)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
-
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar6, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
-
-
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar6, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgChainkiller, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar6, NULL, pKiller); MESSAGE_END(); 
-} 
-}
-} 
-
-if (pKiller->round_frags_sniper ==7)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgPos1, NULL, pKiller); MESSAGE_END(); //starpos 2
-
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar7, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
-
-
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar7, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgChainkiller, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar7, NULL, pKiller); MESSAGE_END(); 
-} 
-}
-} 
-
-if (pKiller->round_frags_sniper ==8)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
-
-if(pVictim->pev->round_frags_sniper >= 4)
+		// 5. Stopper / Standard Kill / Multikill
+		if (pVictim->round_frags >= 4) // Victim was on a streak
+		{
+			MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
+			MESSAGE_END();
+			MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller);
+			MESSAGE_END();
+		}
+		else if (!bSpecialTriggered) // Show normal kill/HS if no special event
+		{
+			if (pVictim->m_bHeadshotKilled)
+			{
+				MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
+				MESSAGE_END();
+				if (peKiller->round_frags_headshot >= 2)
+				{
+					MESSAGE_BEGIN(MSG_ONE, gmsgChainHeadshot, NULL, pKiller);
+					MESSAGE_END();
+				}
+			}
+			else
+			{
+				MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
+				MESSAGE_END();
+				
+				if (peKiller->round_frags == 2) { MESSAGE_BEGIN(MSG_ONE, gmsgDoublekill, NULL, pKiller); MESSAGE_END(); }
+				else if (peKiller->round_frags == 3) { MESSAGE_BEGIN(MSG_ONE, gmsgTriplekill, NULL, pKiller); MESSAGE_END(); }
+				else if (peKiller->round_frags >= 4) { MESSAGE_BEGIN(MSG_ONE, gmsgChainkiller, NULL, pKiller); MESSAGE_END(); }
+			}
+		}
+	}
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4040,92 +3922,13 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar8, NULL, pKiller); MESSAGE_END();
 } 
 }
 } 
-
-if (pKiller->round_frags_sniper == 9)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgPos1, NULL, pKiller); MESSAGE_END(); //starpos 2
-
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar9, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
-
-
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar9, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgChainkiller, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar9, NULL, pKiller); MESSAGE_END(); 
-} 
-}
-} 
-
-if (pKiller->round_frags_sniper ==10)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
-
-switch (RANDOM_LONG(1, 2))
-{
-case 1:
-MESSAGE_BEGIN(MSG_ONE, gmsgHotKiller, NULL, pKiller);
-MESSAGE_END();
-break;
-
-case 2:
-MESSAGE_BEGIN(MSG_ONE, gmsgNightmare, NULL, pKiller);
-MESSAGE_END();
-break;
-}
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimGold, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgGoldStar10, NULL, pKiller);
-MESSAGE_END();
-
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar10, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
-
-
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar10, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgChainkiller, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar10, NULL, pKiller); MESSAGE_END(); 
-} 
-}
-}
 
 //
-if (pKiller->round_frags_sniper ==11)
+if (peKiller->round_frags_sniper ==11)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4153,12 +3956,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar1, NULL, pKiller); MESSAGE_END();
 }
 
 
-if (pKiller->round_frags_sniper == 12)
+if (peKiller->round_frags_sniper == 12)
 {
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4185,12 +3988,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar2, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 13)
+if (peKiller->round_frags_sniper == 13)
 {
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4217,11 +4020,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar3, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 14)
+if (peKiller->round_frags_sniper == 14)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4248,7 +4051,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar4, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 15)
+if (peKiller->round_frags_sniper == 15)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
@@ -4270,7 +4073,7 @@ MESSAGE_END();
 MESSAGE_BEGIN(MSG_ONE, gmsgBlueStar5, NULL, pKiller);
 MESSAGE_END();
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4297,11 +4100,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar5, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 16)
+if (peKiller->round_frags_sniper == 16)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4326,11 +4129,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar6, NULL, pKiller); MESSAGE_END();
 } 
 }
 
-if (pKiller->round_frags_sniper == 17)
+if (peKiller->round_frags_sniper == 17)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4357,42 +4160,16 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar7, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 18)
+if (peKiller->round_frags_sniper == 18)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
-{
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgStopper, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgStopperStar8, NULL, pKiller); MESSAGE_END(); 
-}
-else
-{
 
-
-if (pVictim->m_bHeadshotKilled) 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimHs, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgHeadshotStar8, NULL, pKiller); MESSAGE_END(); 
-} 
-else 
-{ 
-MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimKill, NULL, pKiller);
-MESSAGE_END();
-MESSAGE_BEGIN(MSG_ONE, gmsgChainkiller, NULL, pKiller); MESSAGE_END(); 
-MESSAGE_BEGIN(MSG_ONE, gmsgKillStar8, NULL, pKiller); MESSAGE_END(); 
-} 
-}
-} 
-
-if (pKiller->round_frags_sniper == 19)
+if (peKiller->round_frags_sniper == 19)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4419,7 +4196,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar9, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 20)
+if (peKiller->round_frags_sniper == 20)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 switch (RANDOM_LONG(1, 2))
@@ -4440,7 +4217,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgGoldStar10, NULL, pKiller);
 MESSAGE_END();
 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4469,12 +4246,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar10, NULL, pKiller); MESSAGE_END();
 }
 
 //
-if (pKiller->round_frags_sniper ==21)
+if (peKiller->round_frags_sniper ==21)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4502,12 +4279,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar1, NULL, pKiller); MESSAGE_END();
 }
 
 
-if (pKiller->round_frags_sniper == 22)
+if (peKiller->round_frags_sniper == 22)
 {
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4534,12 +4311,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar2, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 23)
+if (peKiller->round_frags_sniper == 23)
 {
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4566,12 +4343,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar3, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 24)
+if (peKiller->round_frags_sniper == 24)
 {
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4598,7 +4375,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar4, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 25)
+if (peKiller->round_frags_sniper == 25)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
@@ -4620,7 +4397,7 @@ MESSAGE_END();
 MESSAGE_BEGIN(MSG_ONE, gmsgBlueStar5, NULL, pKiller);
 MESSAGE_END();
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4647,11 +4424,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar5, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 26)
+if (peKiller->round_frags_sniper == 26)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4676,11 +4453,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar6, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 27)
+if (peKiller->round_frags_sniper == 27)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4707,11 +4484,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar7, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 28)
+if (peKiller->round_frags_sniper == 28)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4738,11 +4515,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar8, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 29)
+if (peKiller->round_frags_sniper == 29)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4769,7 +4546,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar9, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 30)
+if (peKiller->round_frags_sniper == 30)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 switch (RANDOM_LONG(1, 2))
@@ -4790,7 +4567,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgGoldStar10, NULL, pKiller);
 MESSAGE_END();
 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4820,11 +4597,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar10, NULL, pKiller); MESSAGE_END();
 }
 
 //
-if (pKiller->round_frags_sniper ==31)
+if (peKiller->round_frags_sniper ==31)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4852,12 +4629,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar1, NULL, pKiller); MESSAGE_END();
 }
 
 
-if (pKiller->round_frags_sniper == 32)
+if (peKiller->round_frags_sniper == 32)
 {
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4884,12 +4661,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar2, NULL, pKiller); MESSAGE_END();
 } 
 }
 
-if (pKiller->round_frags_sniper == 33)
+if (peKiller->round_frags_sniper == 33)
 {
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4918,11 +4695,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar3, NULL, pKiller); MESSAGE_END();
 }
 
 
-if (pKiller->round_frags_sniper == 34)
+if (peKiller->round_frags_sniper == 34)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4949,7 +4726,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar4, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 35)
+if (peKiller->round_frags_sniper == 35)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
@@ -4971,7 +4748,7 @@ MESSAGE_END();
 MESSAGE_BEGIN(MSG_ONE, gmsgBlueStar5, NULL, pKiller);
 MESSAGE_END();
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -4998,11 +4775,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar5, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 36)
+if (peKiller->round_frags_sniper == 36)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5029,11 +4806,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar6, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 37)
+if (peKiller->round_frags_sniper == 37)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5060,11 +4837,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar7, NULL, pKiller); MESSAGE_END();
 } 
 }
 
-if (pKiller->round_frags_sniper == 38)
+if (peKiller->round_frags_sniper == 38)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5091,11 +4868,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar8, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 39)
+if (peKiller->round_frags_sniper == 39)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5122,7 +4899,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar9, NULL, pKiller); MESSAGE_END();
 } 
 }
 
-if (pKiller->round_frags_sniper == 40)
+if (peKiller->round_frags_sniper == 40)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 switch (RANDOM_LONG(1, 2))
@@ -5142,7 +4919,7 @@ MESSAGE_END();
 MESSAGE_BEGIN(MSG_ONE, gmsgGoldStar10, NULL, pKiller);
 MESSAGE_END();
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5170,11 +4947,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar10, NULL, pKiller); MESSAGE_END();
 }
 
 //
-if (pKiller->round_frags_sniper ==41)
+if (peKiller->round_frags_sniper ==41)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5202,12 +4979,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar1, NULL, pKiller); MESSAGE_END();
 }
 
 
-if (pKiller->round_frags_sniper == 42)
+if (peKiller->round_frags_sniper == 42)
 {
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5234,12 +5011,12 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar2, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 43)
+if (peKiller->round_frags_sniper == 43)
 {
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5266,11 +5043,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar3, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 44)
+if (peKiller->round_frags_sniper == 44)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5297,7 +5074,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar4, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 45)
+if (peKiller->round_frags_sniper == 45)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
@@ -5319,7 +5096,7 @@ MESSAGE_END();
 MESSAGE_BEGIN(MSG_ONE, gmsgBlueStar5, NULL, pKiller);
 MESSAGE_END();
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5346,11 +5123,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar5, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 46)
+if (peKiller->round_frags_sniper == 46)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5377,11 +5154,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar6, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 47)
+if (peKiller->round_frags_sniper == 47)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5410,11 +5187,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar7, NULL, pKiller); MESSAGE_END();
 
 
 
-if (pKiller->round_frags_sniper == 48)
+if (peKiller->round_frags_sniper == 48)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5441,11 +5218,11 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar8, NULL, pKiller); MESSAGE_END();
 } 
 }
 
-if (pKiller->round_frags_sniper == 49)
+if (peKiller->round_frags_sniper == 49)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5472,7 +5249,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar9, NULL, pKiller); MESSAGE_END();
 }
 } 
 
-if (pKiller->round_frags_sniper == 50)
+if (peKiller->round_frags_sniper == 50)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgPos2, NULL, pKiller); MESSAGE_END();  //starpos 1 
 switch (RANDOM_LONG(1, 2))
@@ -5493,7 +5270,7 @@ MESSAGE_BEGIN(MSG_ONE, gmsgGoldStar10, NULL, pKiller);
 MESSAGE_END();
 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5524,13 +5301,13 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar10, NULL, pKiller); MESSAGE_END();
 //headshot 
 if (pVictim->m_bHeadshotKilled)
 {
-pKiller->round_frags_headshot += 1;
+peKiller->round_frags_headshot += 1;
 
-if (pKiller->round_frags_headshot == 1)
+if (peKiller->round_frags_headshot == 1)
 {
-pKiller->round_frags += 1; 
+peKiller->round_frags += 1; 
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5547,12 +5324,12 @@ MESSAGE_END();
 }
 }
 
-else if (pKiller->round_frags_headshot >= 2)
+else if (peKiller->round_frags_headshot >= 2)
 {
 
-pKiller->round_frags += 1;
+peKiller->round_frags += 1;
 
-if(pVictim->pev->round_frags_sniper >= 4)
+if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
 MESSAGE_END();
@@ -5575,16 +5352,16 @@ MESSAGE_END();
 else
 { 
 
-pKiller->round_frags += IPointsForKill(peKiller, pVictim);
+peKiller->round_frags += IPointsForKill(peKiller, pVictim);
 
-if (pKiller->round_frags == 1)
+if (peKiller->round_frags == 1)
 {
-pKiller->round_frags_headshot = 0;
+peKiller->round_frags_headshot = 0;
 }
 
-else if (pKiller->round_frags == 2)
+else if (peKiller->round_frags == 2)
 {
-pKiller->round_frags_headshot = 0;
+peKiller->round_frags_headshot = 0;
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPointkill, NULL, pKiller);
 MESSAGE_END();
@@ -5592,10 +5369,10 @@ MESSAGE_BEGIN(MSG_ONE, gmsgPointNumber, NULL, pKiller);
 MESSAGE_END();
 }
 
-else if (pKiller->round_frags == 3)
+else if (peKiller->round_frags == 3)
 {
 
-pKiller->round_frags_headshot = 0;
+peKiller->round_frags_headshot = 0;
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPointkill, NULL, pKiller);
 MESSAGE_END();
@@ -5604,10 +5381,10 @@ MESSAGE_END();
 
 }
 
-else if (pKiller->round_frags >= 4)
+else if (peKiller->round_frags >= 4)
 {
 
-pKiller->round_frags_headshot = 0;
+peKiller->round_frags_headshot = 0;
 
 MESSAGE_BEGIN(MSG_ONE, gmsgPointkill, NULL, pKiller);
 MESSAGE_END();
@@ -5622,8 +5399,8 @@ MESSAGE_END();
 
 			if (pVictim->m_bIsVIP)
 			{
-				killer->HintMessage("#Hint_reward_for_killing_vip", TRUE);
-				killer->AddAccount(REWARD_KILLED_VIP);
+				peKiller->HintMessage("#Hint_reward_for_killing_vip", TRUE);
+				peKiller->AddAccount(REWARD_KILLED_VIP);
 
 				MESSAGE_BEGIN(MSG_SPEC, SVC_DIRECTOR);
 					WRITE_BYTE(9);
@@ -5633,25 +5410,19 @@ MESSAGE_END();
 					WRITE_LONG(DRC_FLAG_PRIO_MASK | DRC_FLAG_DRAMATIC | DRC_FLAG_FINAL);
 				MESSAGE_END();
 
-				UTIL_LogPrintf("\"%s<%i><%s><TERRORIST>\" triggered \"Assassinated_The_VIP\"\n", STRING(killer->pev->netname), GETPLAYERUSERID(killer->edict()), GETPLAYERAUTHID(killer->edict()));
+				UTIL_LogPrintf("\"%s<%i><%s><TERRORIST>\" triggered \"Assassinated_The_VIP\"\n", STRING(peKiller->pev->netname), GETPLAYERUSERID(peKiller->edict()), GETPLAYERAUTHID(peKiller->edict()));
 			}
 			else
-				killer->AddAccount(REWARD_KILLED_ENEMY);
+				peKiller->AddAccount(REWARD_KILLED_ENEMY);
 
-			if (!(killer->m_flDisplayHistory & DHF_ENEMY_KILLED))
+			if (!(peKiller->m_flDisplayHistory & DHF_ENEMY_KILLED))
 			{
-				killer->m_flDisplayHistory |= DHF_ENEMY_KILLED;
-				killer->HintMessage("#Hint_win_round_by_killing_enemy");
+				peKiller->m_flDisplayHistory |= DHF_ENEMY_KILLED;
+				peKiller->HintMessage("#Hint_win_round_by_killing_enemy");
 			}
 		}
 
 		FireTargets("game_playerkill", peKiller, peKiller, USE_TOGGLE, 0);
-	}
-	//else //bill = disable for cspb
-	//{
-		// killed by the world
-		//pKiller->frags -= 1;
-//	}
 
 	// update the scores
 	// killed scores
@@ -5664,22 +5435,23 @@ MESSAGE_END();
 	MESSAGE_END();
 
 	// killers score, if it's a player
-	CBaseEntity *ep = CBaseEntity::Instance(pKiller);
-
-	if (ep && ep->Classify() == CLASS_PLAYER)
 	{
-		CBasePlayer *PK = static_cast<CBasePlayer *>(ep);
+		CBaseEntity *ep = CBaseEntity::Instance(pKiller);
 
-		MESSAGE_BEGIN(MSG_ALL, gmsgScoreInfo);
-			WRITE_BYTE(ENTINDEX(PK->edict()));
-			WRITE_SHORT((int)PK->pev->frags);
-			WRITE_SHORT(PK->m_iDeaths);
-			WRITE_SHORT(0);
-			WRITE_SHORT(PK->m_iTeam);
-		MESSAGE_END();
+		if (ep && ep->Classify() == CLASS_PLAYER)
+		{
+			CBasePlayer *PK = static_cast<CBasePlayer *>(ep);
 
-		// let the killer paint another decal as soon as he'd like.
-		PK->m_flNextDecalTime = gpGlobals->time;
+			MESSAGE_BEGIN(MSG_ALL, gmsgScoreInfo);
+				WRITE_BYTE(ENTINDEX(PK->edict()));
+				WRITE_SHORT((int)PK->pev->frags);
+				WRITE_SHORT(PK->m_iDeaths);
+				WRITE_SHORT(0);
+				WRITE_SHORT(PK->m_iTeam);
+			MESSAGE_END();
+
+			PK->m_flNextDecalTime = gpGlobals->time;
+		}
 	}
 
 

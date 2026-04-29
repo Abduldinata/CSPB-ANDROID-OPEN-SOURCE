@@ -23,6 +23,8 @@
 #endif
 
 #include <new>
+#include <string>
+#include <vector>
 
 #include "hud.h"
 #include "cl_util.h"
@@ -94,6 +96,154 @@ void __CmdFunc_GunSmoke()
 		gEngfuncs.Cvar_SetValue( "cl_gunsmoke", 1 );
 }
 
+static int CSPB_ClampLobbyClassIndex( int classIndex )
+{
+	if( classIndex < 1 )
+		return 1;
+
+	if( classIndex > 5 )
+		return 5;
+
+	return classIndex;
+}
+
+static void CSPB_RunLobbyClassAlias( const char *prefix, int classIndex )
+{
+	char command[64];
+	snprintf( command, sizeof( command ), "%s%d\n", prefix, CSPB_ClampLobbyClassIndex( classIndex ) );
+	gEngfuncs.pfnClientCmd( command );
+}
+
+void __CmdFunc_PB_OpenActiveLobbyMenu()
+{
+	// 1. Run Map and Mode Aliases
+	char command[128];
+	const char *levelName = gEngfuncs.pfnGetLevelName();
+	if ( levelName && levelName[0] )
+	{
+		// levelName is usually "maps/pb_luxville.bsp"
+		// We want just the basename "pb_luxville"
+		const char *slash = strrchr( levelName, '/' );
+		if ( !slash ) slash = strrchr( levelName, '\\' );
+		const char *base = slash ? slash + 1 : levelName;
+		
+		char mapBase[64];
+		strncpy( mapBase, base, sizeof( mapBase ) - 1 );
+		mapBase[sizeof( mapBase ) - 1] = 0;
+		
+		char *dot = strrchr( mapBase, '.' );
+		if ( dot ) *dot = 0;
+		
+		snprintf( command, sizeof( command ), "_db_map_%s\n", mapBase );
+		gEngfuncs.pfnClientCmd( command );
+	}
+
+	if ( gHUD.pb_active_mode && gHUD.pb_active_mode->string )
+	{
+		snprintf( command, sizeof( command ), "_db_mode_%s\n", gHUD.pb_active_mode->string );
+		gEngfuncs.pfnClientCmd( command );
+	}
+
+	// 2. Run Class Alias
+	int currentTeam = 2;
+	if( gHUD.m_pbteam )
+		currentTeam = (int)gHUD.m_pbteam->value;
+
+	if( currentTeam == 1 )
+	{
+		int redClass = 1;
+		if( gHUD.pb_active_red_class )
+			redClass = (int)gHUD.pb_active_red_class->value;
+
+		CSPB_RunLobbyClassAlias( "_selected_red_class_", redClass );
+	}
+	else
+	{
+		int blueClass = 1;
+		if( gHUD.pb_active_blue_class )
+			blueClass = (int)gHUD.pb_active_blue_class->value;
+
+		CSPB_RunLobbyClassAlias( "_selected_blue_class_", blueClass );
+	}
+}
+
+void __CmdFunc_PB_SelectBlueClass()
+{
+	int classIndex = 1;
+
+	if( gEngfuncs.Cmd_Argc() > 1 )
+		classIndex = atoi( gEngfuncs.Cmd_Argv( 1 ) );
+
+	classIndex = CSPB_ClampLobbyClassIndex( classIndex );
+	gEngfuncs.Cvar_SetValue( "pb_active_blue_class", classIndex );
+	gEngfuncs.Cvar_SetValue( "pbblueselect", classIndex );
+	gEngfuncs.Cvar_SetValue( "pbteamselect", 2 );
+}
+
+void __CmdFunc_PB_SelectRedClass()
+{
+	int classIndex = 1;
+
+	if( gEngfuncs.Cmd_Argc() > 1 )
+		classIndex = atoi( gEngfuncs.Cmd_Argv( 1 ) );
+
+	classIndex = CSPB_ClampLobbyClassIndex( classIndex );
+	gEngfuncs.Cvar_SetValue( "pb_active_red_class", classIndex );
+	gEngfuncs.Cvar_SetValue( "pbredselect", classIndex );
+	gEngfuncs.Cvar_SetValue( "pbteamselect", 1 );
+}
+
+void __CmdFunc_PB_ToggleLobbySide()
+{
+	int currentTeam = 2;
+
+	if( gHUD.m_pbteam )
+		currentTeam = (int)gHUD.m_pbteam->value;
+
+	if( currentTeam == 2 )
+	{
+		int redClass = 1;
+		if( gHUD.pb_active_red_class )
+			redClass = (int)gHUD.pb_active_red_class->value;
+
+		CSPB_RunLobbyClassAlias( "_selected_red_class_", redClass );
+		return;
+	}
+
+	int blueClass = 1;
+	if( gHUD.pb_active_blue_class )
+		blueClass = (int)gHUD.pb_active_blue_class->value;
+
+	CSPB_RunLobbyClassAlias( "_selected_blue_class_", blueClass );
+}
+
+static void CSPB_PreloadLobbyUiSounds( void )
+{
+	static bool s_preloaded = false;
+
+	if( s_preloaded )
+		return;
+
+	static const char *kLobbyUiSounds[] =
+	{
+		"addons/neda/ui/enter.wav",
+		"addons/neda/ui/click.wav",
+		"addons/neda/ui/switch.wav",
+		"addons/neda/ui/use.wav",
+		"addons/neda/ui/back.wav"
+	};
+
+	for( size_t i = 0; i < ( sizeof( kLobbyUiSounds ) / sizeof( kLobbyUiSounds[0] )); ++i )
+	{
+		// Force the client audio path to register/load lobby UI sounds early.
+		// This reduces first-use stalls later when CFG touch buttons begin calling `play`.
+		gEngfuncs.pfnPlaySoundByName( const_cast<char *>( kLobbyUiSounds[i] ), 0.0f );
+	}
+
+	s_preloaded = true;
+	gEngfuncs.Con_Printf( "CSPB_CLIENT: preloaded lobby UI sounds\n" );
+}
+
 #define XASH_GENERATE_BUILDNUM
 
 #if defined(XASH_GENERATE_BUILDNUM)
@@ -158,7 +308,13 @@ void __CmdFunc_MouseSucksClose( void ) { evdev_open = false; }
 // This is called every time the DLL is loaded
 void CHud :: Init( void )
 {
+	gEngfuncs.Con_Printf("CSPB_CLIENT: CHud::Init start\n");
+	CSPB_PreloadLobbyUiSounds();
 	HOOK_COMMAND( "special", InputCommandSpecial );
+	HOOK_COMMAND( "PB_SelectBlueClass", PB_SelectBlueClass );
+	HOOK_COMMAND( "PB_SelectRedClass", PB_SelectRedClass );
+	HOOK_COMMAND( "PB_OpenActiveLobbyMenu", PB_OpenActiveLobbyMenu );
+	HOOK_COMMAND( "PB_ToggleLobbySide", PB_ToggleLobbySide );
 	//HOOK_COMMAND( "gunsmoke", GunSmoke );
 
 #ifdef __ANDROID__
@@ -183,6 +339,7 @@ void CHud :: Init( void )
 
 
 	HOOK_MESSAGE( ShadowIdx );
+	gEngfuncs.Con_Printf("CSPB_CLIENT: base HUD messages hooked\n");
 
 	CVAR_CREATE( "_vgui_menus", "1", FCVAR_ARCHIVE | FCVAR_USERINFO );
 	CVAR_CREATE( "_cl_autowepswitch", "1", FCVAR_ARCHIVE | FCVAR_USERINFO );
@@ -229,6 +386,9 @@ m_pbteam  = CVAR_CREATE( "pbteamselect", "1", FCVAR_ARCHIVE );
 m_pbredclass  = CVAR_CREATE( "pbredselect", "1", FCVAR_ARCHIVE );
 
 m_pbblueclass  = CVAR_CREATE( "pbblueselect", "1", FCVAR_ARCHIVE );
+pb_active_red_class = CVAR_CREATE( "pb_active_red_class", "1", FCVAR_ARCHIVE );
+pb_active_blue_class = CVAR_CREATE( "pb_active_blue_class", "1", FCVAR_ARCHIVE );
+pb_active_mode = CVAR_CREATE( "pb_active_mode", "tdm", FCVAR_ARCHIVE );
 
 pb_mission  = CVAR_CREATE( "pb_mission", "1", FCVAR_ARCHIVE );
 
@@ -277,11 +437,13 @@ m_star10cmd  = CVAR_CREATE( "billflxstar10cmd", "0", 0 );
 
 //inv
 
-inventory_primary = CVAR_CREATE( "inventory_primary", "20", 0 );//default k2
-inventory_secondary = CVAR_CREATE( "inventory_secondary", "3", 0 );//default k5
-inventory_melee = CVAR_CREATE( "inventory_melee", "3", 0 );//default  knife 
-inventory_explosive = CVAR_CREATE( "inventory_explosive", "1", 0 );
-inventory_special = CVAR_CREATE( "inventory_special", "1", 0 );
+// Keep selected inventory slots across restarts so lobby equip state survives beyond alias-only CFG flow.
+inventory_primary = CVAR_CREATE( "inventory_primary", "20", FCVAR_ARCHIVE );//default k2
+inventory_secondary = CVAR_CREATE( "inventory_secondary", "3", FCVAR_ARCHIVE );//default k5
+inventory_melee = CVAR_CREATE( "inventory_melee", "3", FCVAR_ARCHIVE );//default  knife 
+inventory_explosive = CVAR_CREATE( "inventory_explosive", "1", FCVAR_ARCHIVE );
+inventory_special = CVAR_CREATE( "inventory_special", "1", FCVAR_ARCHIVE );
+inv_profile = CVAR_CREATE( "inv_profile", "default", FCVAR_ARCHIVE );
 
 //win
 m_bluewinann  = CVAR_CREATE( "bluewin", "0", 0 );
@@ -402,9 +564,11 @@ m_Health.Init();
 	m_Train.Init();
 	m_Battery.Init();
 	m_StatusIcons.Init();
-	m_ZBS.Init();
-	m_ZB2.Init();
-	m_ZB3.Init();
+	// CSPB Blankout runs only non-zombie modes. Keep zombie HUD modules disabled
+	// so they don't hook messages / load HUD assets during normal TDM startup.
+	//m_ZBS.Init();
+	//m_ZB2.Init();
+	//m_ZB3.Init();
 	m_MoeTouch.Init();
 
 	// chat, death notice, status bars and other
@@ -422,7 +586,7 @@ m_Health.Init();
 	m_HeadName.Init();
 	m_HealthBar.Init();
 
-m_KillEffect.Init();
+	m_KillEffect.Init();
 
 	m_Radar.Init();
 	m_Scoreboard.Init();
@@ -842,6 +1006,7 @@ HOOK_MESSAGE(DamagePb);
 HOOK_COMMAND("DamagPb", CommandActive);
 
 	m_iFlags = HUD_DRAW;
+	m_fFade = 0.0f;
 	return 1;
 }
 
@@ -862,7 +1027,7 @@ void CHudDamagePb::UserCmd_CommandActive(void)
 int CHudDamagePb::VidInit()
 {
 
-m_damage_tex = gRenderAPI.GL_LoadTexture("materials/pb/hud/damage.tga", NULL, 0, TF_NEAREST |TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP );
+m_damage_tex = gRenderAPI.GL_LoadTexture("gfx/billflx/damage.png", NULL, 0, TF_NEAREST |TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP );
 return 1;
 }
 
@@ -872,9 +1037,10 @@ int alphaBalance;
 	int alphaStatic;
 
 	m_fFade -= gHUD.m_flTimeDelta;
-	if( m_fFade < 0)
+	if( m_fFade <= 0)
 	{
 		m_fFade = 0.0f;
+		return 1;
 	}
 	
 	float interpolate2 = ( 2 - m_fFade ) / 2;
@@ -893,9 +1059,9 @@ gRenderAPI.GL_SelectTexture( 0 );
 gRenderAPI.GL_Bind(0, m_damage_tex);
 gEngfuncs.pTriAPI->Color4ub(255, 255, 255, alphaStatic);
 
-DrawUtils::Draw2DQuad( (INT_XPOS(0) + 0) * gHUD.m_flScale, (INT_YPOS(0) * 0) * gHUD.m_flScale,(INT_XPOS(15.8) + 0 + gHUD.GetCharHeight() ) * gHUD.m_flScale,(INT_YPOS(22) * 0.5 + gHUD.GetCharHeight() ) * gHUD.m_flScale );
-
 gEngfuncs.pTriAPI->RenderMode(kRenderTransTexture);
+DrawUtils::Draw2DQuad( (INT_XPOS(0) + 0) * gHUD.m_flScale, (INT_YPOS(0) * 0) * gHUD.m_flScale,(INT_XPOS(15.8) + 0 + gHUD.GetCharHeight() ) * gHUD.m_flScale,(INT_YPOS(22) * 0.5 + gHUD.GetCharHeight() ) * gHUD.m_flScale );
+gEngfuncs.pTriAPI->RenderMode(kRenderNormal);
 
 return 1;
 }
@@ -931,13 +1097,14 @@ HOOK_MESSAGE(DeathScreen);
 HOOK_COMMAND("DeathScreen", CommandActiveDeathScreen);
 
 	m_iFlags = HUD_DRAW;
+	m_fFade = 0.0f;
 	return 1;
 }
 
 int CHudDeathScreen::VidInit()
 {
 
-m_death_tex = gRenderAPI.GL_LoadTexture("materials/pb/hud/bloody_screen.tga", NULL, 0, TF_NEAREST |TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP );
+m_death_tex = gRenderAPI.GL_LoadTexture("gfx/billflx/bloody_screen.png", NULL, 0, TF_NEAREST |TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP );
 return 1;
 }
 
@@ -948,9 +1115,10 @@ int alphaBalance;
 	int alphaStatic;
 
 	m_fFade -= gHUD.m_flTimeDelta;
-	if( m_fFade < 0)
+	if( m_fFade <= 0)
 	{
 		m_fFade = 0.0f;
+		return 1;
 	}
 	
 	float interpolate2 = ( 2 - m_fFade ) / 2;
@@ -968,8 +1136,9 @@ int alphaBalance;
 gRenderAPI.GL_SelectTexture( 0 );
 gRenderAPI.GL_Bind(0, m_death_tex);
 gEngfuncs.pTriAPI->Color4ub(255, 255, 255, alphaStatic);
-DrawUtils::Draw2DQuad( (INT_XPOS(0) + 0) * gHUD.m_flScale, (INT_YPOS(0) * 0) * gHUD.m_flScale,(INT_XPOS(15.8) + 0 + gHUD.GetCharHeight() ) * gHUD.m_flScale,(INT_YPOS(22) * 0.5 + gHUD.GetCharHeight() ) * gHUD.m_flScale );
 gEngfuncs.pTriAPI->RenderMode(kRenderTransTexture);
+DrawUtils::Draw2DQuad( (INT_XPOS(0) + 0) * gHUD.m_flScale, (INT_YPOS(0) * 0) * gHUD.m_flScale,(INT_XPOS(15.8) + 0 + gHUD.GetCharHeight() ) * gHUD.m_flScale,(INT_YPOS(22) * 0.5 + gHUD.GetCharHeight() ) * gHUD.m_flScale );
+gEngfuncs.pTriAPI->RenderMode(kRenderNormal);
 
 return 1;
 }
@@ -1087,6 +1256,251 @@ const char *iSpe[] = {
 ""//===============================================
 };
 
+static std::vector<std::string> g_PrimAll;
+static std::vector<std::string> g_PrimShotgun;
+static std::vector<std::string> g_PrimSniper;
+static std::vector<std::string> g_Sec;
+static std::vector<std::string> g_Melee;
+static std::vector<std::string> g_Explosive;
+static std::vector<std::string> g_Special;
+static bool g_WeaponListsLoaded = false;
+static char g_LastWeaponListKey[64] = {0};
+
+static bool IsEmptyOrDefaultProfile(const char *profile)
+{
+	if (!profile || !profile[0])
+		return true;
+	return !stricmp(profile, "default") || !stricmp(profile, "0");
+}
+
+static void LoadWeaponListFile(const char *filename, std::vector<std::string> &out)
+{
+	out.clear();
+
+	char *buffer = (char *)gEngfuncs.COM_LoadFile(filename, 5, nullptr);
+	if (!buffer)
+		return;
+
+	char token[4096];
+	char *parsePos = buffer;
+	while ((parsePos = gEngfuncs.COM_ParseFile(parsePos, token)))
+	{
+		if (!token[0])
+			continue;
+
+		// Ignore comment-like tokens
+		if (token[0] == '#' || (token[0] == '/' && token[1] == '/'))
+			continue;
+
+		// Expect "weapon_xxx" tokens; store full buy command for InventoryGive.
+		if (!strnicmp(token, "weapon_", 7))
+		{
+			std::string cmd("pbbuy ");
+			cmd += token;
+			out.push_back(cmd);
+		}
+	}
+
+	gEngfuncs.COM_FreeFile(buffer);
+}
+
+static bool TryLoadWeaponListFile(const char *filename, std::vector<std::string> &out)
+{
+	out.clear();
+	char *buffer = (char *)gEngfuncs.COM_LoadFile(filename, 5, nullptr);
+	if (!buffer)
+		return false;
+
+	char token[4096];
+	char *parsePos = buffer;
+	while ((parsePos = gEngfuncs.COM_ParseFile(parsePos, token)))
+	{
+		if (!token[0])
+			continue;
+		if (token[0] == '#' || (token[0] == '/' && token[1] == '/'))
+			continue;
+		if (!strnicmp(token, "weapon_", 7))
+		{
+			std::string cmd("pbbuy ");
+			cmd += token;
+			out.push_back(cmd);
+		}
+	}
+
+	gEngfuncs.COM_FreeFile(buffer);
+	return true; // file existed (even if it contained 0 valid weapon_ tokens)
+}
+
+static void EnsureWeaponListsLoaded(void)
+{
+	const char *gm = CVAR_GET_STRING("mp_gamemode");
+	if (!gm)
+		gm = "";
+
+	const char *profile = CVAR_GET_STRING("inv_profile");
+	if (IsEmptyOrDefaultProfile(profile))
+		profile = "";
+
+	const char *key = profile[0] ? profile : gm;
+
+	if (g_WeaponListsLoaded && !strcmp(g_LastWeaponListKey, key))
+		return;
+
+	strncpy(g_LastWeaponListKey, key, sizeof(g_LastWeaponListKey) - 1);
+	g_LastWeaponListKey[sizeof(g_LastWeaponListKey) - 1] = 0;
+
+	// Primary variants (match mp_gamemode switching in inventory UI)
+	// Allow per-gamemode overrides by creating files like:
+	// - weapon_list/inventory_all_<gamemode>.txt
+	// - weapon_list/inventory_shotgun_<gamemode>.txt
+	// - weapon_list/inventory_sniper_<gamemode>.txt
+	char path[128];
+	bool primAllHasFile = false;
+	snprintf(path, sizeof(path), "weapon_list/inventory_all_%s.txt", key);
+	primAllHasFile = TryLoadWeaponListFile(path, g_PrimAll);
+	if (!primAllHasFile && !profile[0])
+	{
+		snprintf(path, sizeof(path), "weapon_list/inventory_all_%s.txt", gm);
+		primAllHasFile = TryLoadWeaponListFile(path, g_PrimAll);
+	}
+	if (!primAllHasFile)
+		LoadWeaponListFile("weapon_list/inventory_all.txt", g_PrimAll);
+
+	bool primShotgunHasFile = false;
+	snprintf(path, sizeof(path), "weapon_list/inventory_shotgun_%s.txt", key);
+	primShotgunHasFile = TryLoadWeaponListFile(path, g_PrimShotgun);
+	if (!primShotgunHasFile && !profile[0])
+	{
+		snprintf(path, sizeof(path), "weapon_list/inventory_shotgun_%s.txt", gm);
+		primShotgunHasFile = TryLoadWeaponListFile(path, g_PrimShotgun);
+	}
+	if (!primShotgunHasFile)
+		LoadWeaponListFile("weapon_list/inventory_shotgun.txt", g_PrimShotgun);
+
+	bool primSniperHasFile = false;
+	snprintf(path, sizeof(path), "weapon_list/inventory_sniper_%s.txt", key);
+	primSniperHasFile = TryLoadWeaponListFile(path, g_PrimSniper);
+	if (!primSniperHasFile && !profile[0])
+	{
+		snprintf(path, sizeof(path), "weapon_list/inventory_sniper_%s.txt", gm);
+		primSniperHasFile = TryLoadWeaponListFile(path, g_PrimSniper);
+	}
+	if (!primSniperHasFile)
+		LoadWeaponListFile("weapon_list/inventory_sniper.txt", g_PrimSniper);
+
+	// Other categories
+	// Per-gamemode overrides supported: inventory_secondary_<gamemode>.txt, etc.
+	bool secHasFile = false;
+	snprintf(path, sizeof(path), "weapon_list/inventory_secondary_%s.txt", key);
+	secHasFile = TryLoadWeaponListFile(path, g_Sec);
+	if (!secHasFile && !profile[0])
+	{
+		snprintf(path, sizeof(path), "weapon_list/inventory_secondary_%s.txt", gm);
+		secHasFile = TryLoadWeaponListFile(path, g_Sec);
+	}
+	if (!secHasFile)
+		LoadWeaponListFile("weapon_list/inventory_secondary.txt", g_Sec);
+
+	bool meleeHasFile = false;
+	snprintf(path, sizeof(path), "weapon_list/inventory_melee_%s.txt", key);
+	meleeHasFile = TryLoadWeaponListFile(path, g_Melee);
+	if (!meleeHasFile && !profile[0])
+	{
+		snprintf(path, sizeof(path), "weapon_list/inventory_melee_%s.txt", gm);
+		meleeHasFile = TryLoadWeaponListFile(path, g_Melee);
+	}
+	if (!meleeHasFile)
+		LoadWeaponListFile("weapon_list/inventory_melee.txt", g_Melee);
+
+	bool explosiveHasFile = false;
+	snprintf(path, sizeof(path), "weapon_list/inventory_explosive_%s.txt", key);
+	explosiveHasFile = TryLoadWeaponListFile(path, g_Explosive);
+	if (!explosiveHasFile && !profile[0])
+	{
+		snprintf(path, sizeof(path), "weapon_list/inventory_explosive_%s.txt", gm);
+		explosiveHasFile = TryLoadWeaponListFile(path, g_Explosive);
+	}
+	if (!explosiveHasFile)
+		LoadWeaponListFile("weapon_list/inventory_explosive.txt", g_Explosive);
+
+	bool specialHasFile = false;
+	snprintf(path, sizeof(path), "weapon_list/inventory_special_%s.txt", key);
+	specialHasFile = TryLoadWeaponListFile(path, g_Special);
+	if (!specialHasFile && !profile[0])
+	{
+		snprintf(path, sizeof(path), "weapon_list/inventory_special_%s.txt", gm);
+		specialHasFile = TryLoadWeaponListFile(path, g_Special);
+	}
+	if (!specialHasFile)
+		LoadWeaponListFile("weapon_list/inventory_special.txt", g_Special);
+
+	g_WeaponListsLoaded = true;
+}
+
+static int WrapIndex(int index, int count)
+{
+	if (count <= 0)
+		return 0;
+
+	while (index < 0)
+		index += count;
+	while (index >= count)
+		index -= count;
+
+	return index;
+}
+
+static const std::vector<std::string> &GetPrimaryListForGamemode(void)
+{
+	const char *profile = CVAR_GET_STRING("inv_profile");
+	if (!IsEmptyOrDefaultProfile(profile))
+	{
+		// Profile wins over mp_gamemode, so lobby can enforce "sniper only"
+		// even when the server runs tdm/eliminate/etc.
+		if (strstr(profile, "sniper"))
+			return g_PrimSniper;
+		if (strstr(profile, "sg") || strstr(profile, "shotgun"))
+			return g_PrimShotgun;
+		// For other profiles (meleeonly/primaryonly/etc), inventory_all_<profile>.txt
+		// can be used to define the allowed primary list (including empty to disable).
+		return g_PrimAll;
+	}
+
+	const char *gm = CVAR_GET_STRING("mp_gamemode");
+	if (!strcmp(gm, "sg") || !strcmp(gm, "sgb"))
+		return g_PrimShotgun;
+	if (!strcmp(gm, "sniper") || !strcmp(gm, "sniperB"))
+		return g_PrimSniper;
+	return g_PrimAll;
+}
+
+static const char *FallbackAt(const char *const *arr, int count, int index)
+{
+	if (!arr || count <= 0)
+		return nullptr;
+	if (index < 0)
+		return arr[0];
+	if (index >= count)
+		return arr[0];
+	return arr[index];
+}
+
+static void InventoryBuyFromListOrFallback(const std::vector<std::string> &list, const char *const *fallback, int fallbackCount, int index)
+{
+	if (!list.empty())
+	{
+		int wrapped = index;
+		if (wrapped < 0 || wrapped >= (int)list.size())
+			wrapped = 0;
+		ClientCmd(list[wrapped].c_str());
+		return;
+	}
+
+	const char *cmd = FallbackAt(fallback, fallbackCount, index);
+	if (cmd && cmd[0])
+		ClientCmd(cmd);
+}
+
 DECLARE_MESSAGE(m_InventoryGive, InventoryGive);
 DECLARE_COMMAND(m_InventoryGive, CommandActiveInventoryGive);
 
@@ -1145,6 +1559,8 @@ gHUD.Announcement_Red = FALSE;
 gHUD.Announcement_Blue = FALSE;
 gHUD.respawning = FALSE;
 
+EnsureWeaponListsLoaded();
+
 int counterPrim = gHUD.inventory_primary->value;
 int counterSec = gHUD.inventory_secondary->value;
 int counterMelee = gHUD.inventory_melee->value;
@@ -1153,11 +1569,12 @@ int counterSp = gHUD.inventory_special->value;
 
 gHUD.helmet_on = TRUE;//GIVE ME HELMET
 
-ClientCmd(iPrim[counterPrim]);
-ClientCmd(iSec[counterSec]);
-ClientCmd(iMelee[counterMelee]);
-ClientCmd(iEx[counterHegren]);
-ClientCmd(iSpe[counterSp]);
+const std::vector<std::string> &primList = GetPrimaryListForGamemode();
+InventoryBuyFromListOrFallback(primList, iPrim, (int)(sizeof(iPrim) / sizeof(iPrim[0])), counterPrim);
+InventoryBuyFromListOrFallback(g_Sec, iSec, (int)(sizeof(iSec) / sizeof(iSec[0])), counterSec);
+InventoryBuyFromListOrFallback(g_Melee, iMelee, (int)(sizeof(iMelee) / sizeof(iMelee[0])), counterMelee);
+InventoryBuyFromListOrFallback(g_Explosive, iEx, (int)(sizeof(iEx) / sizeof(iEx[0])), counterHegren);
+InventoryBuyFromListOrFallback(g_Special, iSpe, (int)(sizeof(iSpe) / sizeof(iSpe[0])), counterSp);
 
 ClientCmd("BlinkViewmodel");
 
@@ -1366,7 +1783,18 @@ void CHudKeys::UserCmd_CommandActiveShowQ(void)
 
 int CHudKeys::VidInit()
 {
-R_InitTexture(m_keys[0], "gfx/billflx/k_overlay/a.tga");R_InitTexture(m_keys[1], "gfx/billflx/k_overlay/attack.tga");R_InitTexture(m_keys[2], "gfx/billflx/k_overlay/attack2.tga");R_InitTexture(m_keys[3], "gfx/billflx/k_overlay/bg.tga");R_InitTexture(m_keys[4], "gfx/billflx/k_overlay/change.tga");R_InitTexture(m_keys[5], "gfx/billflx/k_overlay/crouch.tga");R_InitTexture(m_keys[6], "gfx/billflx/k_overlay/d.tga");R_InitTexture(m_keys[7], "gfx/billflx/k_overlay/r.tga");R_InitTexture(m_keys[8], "gfx/billflx/k_overlay/s.tga");R_InitTexture(m_keys[9], "gfx/billflx/k_overlay/score.tga");R_InitTexture(m_keys[10], "gfx/billflx/k_overlay/space.tga");R_InitTexture(m_keys[11], "gfx/billflx/k_overlay/w.tga");
+	R_InitTexture(m_keys[0], "gfx/billflx/k_overlay/a.png");
+	R_InitTexture(m_keys[1], "gfx/billflx/k_overlay/attack.png");
+	R_InitTexture(m_keys[2], "gfx/billflx/k_overlay/attack2.png");
+	R_InitTexture(m_keys[3], "gfx/billflx/k_overlay/bg.png");
+	R_InitTexture(m_keys[4], "gfx/billflx/k_overlay/change.png");
+	R_InitTexture(m_keys[5], "gfx/billflx/k_overlay/crouch.png");
+	R_InitTexture(m_keys[6], "gfx/billflx/k_overlay/d.png");
+	R_InitTexture(m_keys[7], "gfx/billflx/k_overlay/r.png");
+	R_InitTexture(m_keys[8], "gfx/billflx/k_overlay/s.png");
+	R_InitTexture(m_keys[9], "gfx/billflx/k_overlay/score.png");
+	R_InitTexture(m_keys[10], "gfx/billflx/k_overlay/space.png");
+	R_InitTexture(m_keys[11], "gfx/billflx/k_overlay/w.png");
 	return 1;
 }
 
@@ -1763,26 +2191,28 @@ DECLARE_COMMAND(m_InventoryUi, CommandActivePrevspe);
 void CHudInventoryUi::UserCmd_CommandActivePrevprim(void)
 {
 
+EnsureWeaponListsLoaded();
+
 if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "none") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "tdm"))
 {
 gHUD.inventory_primary->value -= 1;
 
-if (gHUD.inventory_primary->value == -1)
-gHUD.inventory_primary->value += 60;
+int count = !g_PrimAll.empty() ? (int)g_PrimAll.size() : (int)(sizeof(iPrim) / sizeof(iPrim[0]));
+gHUD.inventory_primary->value = WrapIndex((int)gHUD.inventory_primary->value, count);
 }
 else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sg") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "sgb"))
 {
 gHUD.inventory_primary->value -= 1;
 
-if (gHUD.inventory_primary->value == -1)
-gHUD.inventory_primary->value += 4;
+int count = !g_PrimShotgun.empty() ? (int)g_PrimShotgun.size() : 4;
+gHUD.inventory_primary->value = WrapIndex((int)gHUD.inventory_primary->value, count);
 }
 else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sniper") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "sniperB"))
 {
 gHUD.inventory_primary->value -= 1;
 
-if (gHUD.inventory_primary->value == -1)
-gHUD.inventory_primary->value += 10;
+int count = !g_PrimSniper.empty() ? (int)g_PrimSniper.size() : 10;
+gHUD.inventory_primary->value = WrapIndex((int)gHUD.inventory_primary->value, count);
 }
 
 gEngfuncs.Cvar_SetValue( "inventory_primary", gHUD.inventory_primary->value );
@@ -1791,26 +2221,28 @@ gEngfuncs.Cvar_SetValue( "inventory_primary", gHUD.inventory_primary->value );
 void CHudInventoryUi::UserCmd_CommandActiveNextprim(void)
 {
 
+EnsureWeaponListsLoaded();
+
 if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "none") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "tdm"))
 {
 gHUD.inventory_primary->value += 1;
 
-if (gHUD.inventory_primary->value == 60)
-gHUD.inventory_primary->value -= 60;
+int count = !g_PrimAll.empty() ? (int)g_PrimAll.size() : (int)(sizeof(iPrim) / sizeof(iPrim[0]));
+gHUD.inventory_primary->value = WrapIndex((int)gHUD.inventory_primary->value, count);
 }
 else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sg") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "sgb"))
 {
 gHUD.inventory_primary->value += 1;
 
-if (gHUD.inventory_primary->value == 4)
-gHUD.inventory_primary->value -= 4;
+int count = !g_PrimShotgun.empty() ? (int)g_PrimShotgun.size() : 4;
+gHUD.inventory_primary->value = WrapIndex((int)gHUD.inventory_primary->value, count);
 }
 else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sniper") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "sniperB"))
 {
 gHUD.inventory_primary->value += 1;
 
-if (gHUD.inventory_primary->value == 10)
-gHUD.inventory_primary->value -= 10;
+int count = !g_PrimSniper.empty() ? (int)g_PrimSniper.size() : 10;
+gHUD.inventory_primary->value = WrapIndex((int)gHUD.inventory_primary->value, count);
 }
 
 gEngfuncs.Cvar_SetValue( "inventory_primary", gHUD.inventory_primary->value );
@@ -1819,20 +2251,22 @@ gEngfuncs.Cvar_SetValue( "inventory_primary", gHUD.inventory_primary->value );
 //sec
 void CHudInventoryUi::UserCmd_CommandActivePrevsec(void)
 {
+EnsureWeaponListsLoaded();
 gHUD.inventory_secondary->value -= 1;
 
-if (gHUD.inventory_secondary->value == -1)
-gHUD.inventory_secondary->value += 8;
+int count = !g_Sec.empty() ? (int)g_Sec.size() : (int)(sizeof(iSec) / sizeof(iSec[0]));
+gHUD.inventory_secondary->value = WrapIndex((int)gHUD.inventory_secondary->value, count);
 
 gEngfuncs.Cvar_SetValue( "inventory_secondary", gHUD.inventory_secondary->value );
 }
 
 void CHudInventoryUi::UserCmd_CommandActiveNextsec(void)
 {
+EnsureWeaponListsLoaded();
 gHUD.inventory_secondary->value += 1;
 
-if (gHUD.inventory_secondary->value == 8)
-gHUD.inventory_secondary->value -= 8;
+int count = !g_Sec.empty() ? (int)g_Sec.size() : (int)(sizeof(iSec) / sizeof(iSec[0]));
+gHUD.inventory_secondary->value = WrapIndex((int)gHUD.inventory_secondary->value, count);
 
 gEngfuncs.Cvar_SetValue( "inventory_secondary", gHUD.inventory_secondary->value );
 }
@@ -1840,19 +2274,21 @@ gEngfuncs.Cvar_SetValue( "inventory_secondary", gHUD.inventory_secondary->value 
 //melee
 void CHudInventoryUi::UserCmd_CommandActivePrevmelee(void)
 {
+EnsureWeaponListsLoaded();
 gHUD.inventory_melee->value -= 1;
 
-if (gHUD.inventory_melee->value == -1)
-gHUD.inventory_melee->value += 15;
+int count = !g_Melee.empty() ? (int)g_Melee.size() : (int)(sizeof(iMelee) / sizeof(iMelee[0]));
+gHUD.inventory_melee->value = WrapIndex((int)gHUD.inventory_melee->value, count);
 
 gEngfuncs.Cvar_SetValue( "inventory_melee", gHUD.inventory_melee->value );
 }
 void CHudInventoryUi::UserCmd_CommandActiveNextmelee(void)
 {
+EnsureWeaponListsLoaded();
 gHUD.inventory_melee->value += 1;
 
-if (gHUD.inventory_melee->value == 15)
-gHUD.inventory_melee->value -= 15;
+int count = !g_Melee.empty() ? (int)g_Melee.size() : (int)(sizeof(iMelee) / sizeof(iMelee[0]));
+gHUD.inventory_melee->value = WrapIndex((int)gHUD.inventory_melee->value, count);
 
 gEngfuncs.Cvar_SetValue( "inventory_melee", gHUD.inventory_melee->value );
 }
@@ -1860,19 +2296,21 @@ gEngfuncs.Cvar_SetValue( "inventory_melee", gHUD.inventory_melee->value );
 //explosive 
 void CHudInventoryUi::UserCmd_CommandActivePrevexplo(void)
 {
+EnsureWeaponListsLoaded();
 gHUD.inventory_explosive->value -= 1;
 
-if (gHUD.inventory_explosive->value == -1)
-gHUD.inventory_explosive->value += 4;
+int count = !g_Explosive.empty() ? (int)g_Explosive.size() : (int)(sizeof(iEx) / sizeof(iEx[0]));
+gHUD.inventory_explosive->value = WrapIndex((int)gHUD.inventory_explosive->value, count);
 
 gEngfuncs.Cvar_SetValue( "inventory_explosive", gHUD.inventory_explosive->value );
 }
 void CHudInventoryUi::UserCmd_CommandActiveNextexplo(void)
 {
+EnsureWeaponListsLoaded();
 gHUD.inventory_explosive->value += 1;
 
-if (gHUD.inventory_explosive->value == 4)
-gHUD.inventory_explosive->value -= 4;
+int count = !g_Explosive.empty() ? (int)g_Explosive.size() : (int)(sizeof(iEx) / sizeof(iEx[0]));
+gHUD.inventory_explosive->value = WrapIndex((int)gHUD.inventory_explosive->value, count);
 
 gEngfuncs.Cvar_SetValue( "inventory_explosive", gHUD.inventory_explosive->value );
 }
@@ -1880,19 +2318,21 @@ gEngfuncs.Cvar_SetValue( "inventory_explosive", gHUD.inventory_explosive->value 
 //special 
 void CHudInventoryUi::UserCmd_CommandActivePrevspe(void)
 {
+EnsureWeaponListsLoaded();
 gHUD.inventory_special->value -= 1;
 
-if (gHUD.inventory_special->value == -1)
-gHUD.inventory_special->value += 4;
+int count = !g_Special.empty() ? (int)g_Special.size() : (int)(sizeof(iSpe) / sizeof(iSpe[0]));
+gHUD.inventory_special->value = WrapIndex((int)gHUD.inventory_special->value, count);
 
 gEngfuncs.Cvar_SetValue( "inventory_special", gHUD.inventory_special->value );
 }
 void CHudInventoryUi::UserCmd_CommandActiveNextspe(void)
 {
+EnsureWeaponListsLoaded();
 gHUD.inventory_special->value += 1;
 
-if (gHUD.inventory_special->value == 4)
-gHUD.inventory_special->value -= 4;
+int count = !g_Special.empty() ? (int)g_Special.size() : (int)(sizeof(iSpe) / sizeof(iSpe[0]));
+gHUD.inventory_special->value = WrapIndex((int)gHUD.inventory_special->value, count);
 
 gEngfuncs.Cvar_SetValue( "inventory_special", gHUD.inventory_special->value );
 }
@@ -1902,8 +2342,6 @@ void CHudInventoryUi::UserCmd_CommandActiveOpeninv(void)
 {
 open = TRUE;
 //m_fFade = 1.0f;
-
-ClientCmd("exec touch/pb_ui.cfg");
 
 if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "knife") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "knifeB") )
 {
@@ -2017,7 +2455,7 @@ int CHudInventoryUi::Init()
 {
 gHUD.AddHudElem(this);
 
-/*HOOK_MESSAGE(Openinv);
+HOOK_MESSAGE(Openinv);
 HOOK_COMMAND("Openinv", CommandActiveOpeninv);
 HOOK_MESSAGE(Closeinv);
 HOOK_COMMAND("Closeinv", CommandActiveCloseinv);
@@ -2047,7 +2485,7 @@ HOOK_MESSAGE(Nextspe);
 HOOK_COMMAND("Nextspe", CommandActiveNextspe);
 HOOK_MESSAGE(Prevspe);
 HOOK_COMMAND("Prevspe", CommandActivePrevspe);
-*/
+
 m_iFlags = HUD_DRAW;
 return 1;
 }
@@ -2055,192 +2493,147 @@ return 1;
 
 int CHudInventoryUi::VidInit()
 {
-/*R_InitTexture(bg, "gfx/ui/inv_bg.tga");
+R_InitTexture(bg, "gfx/ui/inv_bg.png");
 
-R_InitTexture(primary[0], "gfx/weapons/wpn_empty.tga");
-R_InitTexture(primary[1], "gfx/weapons/870mcs.tga");
-R_InitTexture(primary[2], "gfx/weapons/ak47.tga");
-R_InitTexture(primary[3], "gfx/weapons/aksopmod.tga");
-R_InitTexture(primary[4], "gfx/weapons/aksopmodcg.tga");
-R_InitTexture(primary[5], "gfx/weapons/apc.tga");
-R_InitTexture(primary[6], "gfx/weapons/as50.tga");
-R_InitTexture(primary[7], "gfx/weapons/aug.tga");
-R_InitTexture(primary[8], "gfx/weapons/augblitz.tga");
-R_InitTexture(primary[9], "gfx/weapons/aughbar.tga");
-R_InitTexture(primary[10], "gfx/weapons/aug_silencer.tga");
-R_InitTexture(primary[11], "gfx/weapons/cheytac.tga");
-R_InitTexture(primary[12], "gfx/weapons/dragunov.tga");
-R_InitTexture(primary[13], "gfx/weapons/f2000.tga");
-R_InitTexture(primary[14], "gfx/weapons/famas.tga");
-R_InitTexture(primary[15], "gfx/weapons/fg42.tga");
-R_InitTexture(primary[16], "gfx/weapons/g36c.tga");
-R_InitTexture(primary[17], "gfx/weapons/groza.tga");
-R_InitTexture(primary[18], "gfx/weapons/hk417.tga");
-R_InitTexture(primary[19], "gfx/weapons/k1.tga");
-R_InitTexture(primary[20], "gfx/weapons/k2.tga");
-R_InitTexture(primary[21], "gfx/weapons/kar98k.tga");
-R_InitTexture(primary[22], "gfx/weapons/krissbatik.tga");
-R_InitTexture(primary[23], "gfx/weapons/kriss_crb.tga");
-R_InitTexture(primary[24], "gfx/weapons/kriss_silence.tga");
-R_InitTexture(primary[25], "gfx/weapons/kriss_sv.tga");
-R_InitTexture(primary[26], "gfx/weapons/l115a1.tga");
-R_InitTexture(primary[27], "gfx/weapons/m4a1.tga");
-R_InitTexture(primary[28], "gfx/weapons/m4a1_s.tga");
-R_InitTexture(primary[29], "gfx/weapons/m4_cqb_lv1.tga");
-R_InitTexture(primary[30], "gfx/weapons/m4_cqb_lv2.tga");
-R_InitTexture(primary[31], "gfx/weapons/m4_spr_lv1.tga");
-R_InitTexture(primary[32], "gfx/weapons/m4_spr_lv2.tga");
-R_InitTexture(primary[33], "gfx/weapons/m82a1.tga");
-R_InitTexture(primary[34], "gfx/weapons/m1887.tga");
-R_InitTexture(primary[35], "gfx/weapons/m1887w.tga");
-R_InitTexture(primary[36], "gfx/weapons/mp5k.tga");
-R_InitTexture(primary[37], "gfx/weapons/mp7.tga");
-R_InitTexture(primary[38], "gfx/weapons/mp9.tga");
-R_InitTexture(primary[39], "gfx/weapons/msbs.tga");
-R_InitTexture(primary[40], "gfx/weapons/oa93.tga");
-R_InitTexture(primary[41], "gfx/weapons/p90.tga");
-R_InitTexture(primary[42], "gfx/weapons/p90mc.tga");
-R_InitTexture(primary[43], "gfx/weapons/pgm.tga");
-R_InitTexture(primary[44], "gfx/weapons/pindad_ss2_v5.tga");
-R_InitTexture(primary[45], "gfx/weapons/rangemaster338.tga");
-R_InitTexture(primary[46], "gfx/weapons/sc2010.tga");
-R_InitTexture(primary[47], "gfx/weapons/scar_carbine.tga");
-R_InitTexture(primary[48], "gfx/weapons/sg550.tga");
-R_InitTexture(primary[49], "gfx/weapons/sig_sauer.tga");
-R_InitTexture(primary[50], "gfx/weapons/spas_15.tga");
-R_InitTexture(primary[51], "gfx/weapons/spectre.tga");
-R_InitTexture(primary[52], "gfx/weapons/ssg69.tga");
-R_InitTexture(primary[53], "gfx/weapons/t77.tga");
-R_InitTexture(primary[54], "gfx/weapons/tactilite_t2.tga");
-R_InitTexture(primary[55], "gfx/weapons/tar21.tga");
-R_InitTexture(primary[56], "gfx/weapons/ump.tga");
-R_InitTexture(primary[57], "gfx/weapons/watergun.tga");
-R_InitTexture(primary[58], "gfx/weapons/xm8.tga");
-R_InitTexture(primary[59], "gfx/weapons/zombie_slayer.tga");
+R_InitTexture(primary[0], "gfx/billflx/weapons/wpn_empty.png");
+R_InitTexture(primary[1], "gfx/billflx/weapons/870mcs.png");
+R_InitTexture(primary[2], "gfx/billflx/weapons/ak47.png");
+R_InitTexture(primary[3], "gfx/billflx/weapons/aksopmod.png");
+R_InitTexture(primary[4], "gfx/billflx/weapons/aksopmodcg.png");
+R_InitTexture(primary[5], "gfx/billflx/weapons/apc.png");
+R_InitTexture(primary[6], "gfx/billflx/weapons/as50.png");
+R_InitTexture(primary[7], "gfx/billflx/weapons/aug.png");
+R_InitTexture(primary[8], "gfx/billflx/weapons/augblitz.png");
+R_InitTexture(primary[9], "gfx/billflx/weapons/aughbar.png");
+R_InitTexture(primary[10], "gfx/billflx/weapons/aug_silencer.png");
+R_InitTexture(primary[11], "gfx/billflx/weapons/cheytac.png");
+R_InitTexture(primary[12], "gfx/billflx/weapons/dragunov.png");
+R_InitTexture(primary[13], "gfx/billflx/weapons/f2000.png");
+R_InitTexture(primary[14], "gfx/billflx/weapons/famas.png");
+R_InitTexture(primary[15], "gfx/billflx/weapons/fg42.png");
+R_InitTexture(primary[16], "gfx/billflx/weapons/g36c.png");
+R_InitTexture(primary[17], "gfx/billflx/weapons/groza.png");
+R_InitTexture(primary[18], "gfx/billflx/weapons/hk417.png");
+R_InitTexture(primary[19], "gfx/billflx/weapons/k1.png");
+R_InitTexture(primary[20], "gfx/billflx/weapons/k2.png");
+R_InitTexture(primary[21], "gfx/billflx/weapons/kar98k.png");
+R_InitTexture(primary[22], "gfx/billflx/weapons/krissbatik.png");
+R_InitTexture(primary[23], "gfx/billflx/weapons/kriss_crb.png");
+R_InitTexture(primary[24], "gfx/billflx/weapons/kriss_silence.png");
+R_InitTexture(primary[25], "gfx/billflx/weapons/kriss_sv.png");
+R_InitTexture(primary[26], "gfx/billflx/weapons/l115a1.png");
+R_InitTexture(primary[27], "gfx/billflx/weapons/m4a1.png");
+R_InitTexture(primary[28], "gfx/billflx/weapons/m4a1_s.png");
+R_InitTexture(primary[29], "gfx/billflx/weapons/m4_cqb_lv1.png");
+R_InitTexture(primary[30], "gfx/billflx/weapons/m4_cqb_lv2.png");
+R_InitTexture(primary[31], "gfx/billflx/weapons/m4_spr_lv1.png");
+R_InitTexture(primary[32], "gfx/billflx/weapons/m4_spr_lv2.png");
+R_InitTexture(primary[33], "gfx/billflx/weapons/m82a1.png");
+R_InitTexture(primary[34], "gfx/billflx/weapons/m1887.png");
+R_InitTexture(primary[35], "gfx/billflx/weapons/m1887w.png");
+R_InitTexture(primary[36], "gfx/billflx/weapons/mp5k.png");
+R_InitTexture(primary[37], "gfx/billflx/weapons/mp7.png");
+R_InitTexture(primary[38], "gfx/billflx/weapons/mp9.png");
+R_InitTexture(primary[39], "gfx/billflx/weapons/msbs.png");
+R_InitTexture(primary[40], "gfx/billflx/weapons/oa93.png");
+R_InitTexture(primary[41], "gfx/billflx/weapons/p90.png");
+R_InitTexture(primary[42], "gfx/billflx/weapons/p90mc.png");
+R_InitTexture(primary[43], "gfx/billflx/weapons/pgm.png");
+R_InitTexture(primary[44], "gfx/billflx/weapons/pindad_ss2_v5.png");
+R_InitTexture(primary[45], "gfx/billflx/weapons/rangemaster338.png");
+R_InitTexture(primary[46], "gfx/billflx/weapons/sc2010.png");
+R_InitTexture(primary[47], "gfx/billflx/weapons/scar_carbine.png");
+R_InitTexture(primary[48], "gfx/billflx/weapons/sg550.png");
+R_InitTexture(primary[49], "gfx/billflx/weapons/sig_sauer.png");
+R_InitTexture(primary[50], "gfx/billflx/weapons/spas_15.png");
+R_InitTexture(primary[51], "gfx/billflx/weapons/spectre.png");
+R_InitTexture(primary[52], "gfx/billflx/weapons/ssg69.png");
+R_InitTexture(primary[53], "gfx/billflx/weapons/t77.png");
+R_InitTexture(primary[54], "gfx/billflx/weapons/tactilite_t2.png");
+R_InitTexture(primary[55], "gfx/billflx/weapons/tar21.png");
+R_InitTexture(primary[56], "gfx/billflx/weapons/ump.png");
+R_InitTexture(primary[57], "gfx/billflx/weapons/watergun.png");
+R_InitTexture(primary[58], "gfx/billflx/weapons/xm8.png");
+R_InitTexture(primary[59], "gfx/billflx/weapons/zombie_slayer.png");
 
-R_InitTexture(secondary[0], "gfx/weapons/wpn_empty.tga");
-R_InitTexture(secondary[1], "gfx/weapons/raging_bull.tga");
-R_InitTexture(secondary[2], "gfx/weapons/glock.tga");
-R_InitTexture(secondary[3], "gfx/weapons/k5.tga");
-R_InitTexture(secondary[4], "gfx/weapons/desert_eagle.tga");
-R_InitTexture(secondary[5], "gfx/weapons/desert_eagle_dual.tga");
-R_InitTexture(secondary[6], "gfx/weapons/coltpython.tga");
-R_InitTexture(secondary[7], "gfx/weapons/dualhandgun.tga");
-R_InitTexture(secondary[8], "gfx/weapons/bow.tga");
+R_InitTexture(secondary[0], "gfx/billflx/weapons/wpn_empty.png");
+R_InitTexture(secondary[1], "gfx/billflx/weapons/raging_bull.png");
+R_InitTexture(secondary[2], "gfx/billflx/weapons/glock.png");
+R_InitTexture(secondary[3], "gfx/billflx/weapons/k5.png");
+R_InitTexture(secondary[4], "gfx/billflx/weapons/desert_eagle.png");
+R_InitTexture(secondary[5], "gfx/billflx/weapons/desert_eagle_dual.png");
+R_InitTexture(secondary[6], "gfx/billflx/weapons/coltpython.png");
+R_InitTexture(secondary[7], "gfx/billflx/weapons/dualhandgun.png");
+R_InitTexture(secondary[8], "gfx/billflx/weapons/bow.png");
 
-R_InitTexture(melee[0], "gfx/weapons/wpn_empty.tga");
-R_InitTexture(melee[1], "gfx/weapons/saber.tga");
-R_InitTexture(melee[2], "gfx/weapons/miniaxe.tga");
-R_InitTexture(melee[3], "gfx/weapons/m7.tga");
-R_InitTexture(melee[4], "gfx/weapons/karambit.tga");
-R_InitTexture(melee[5], "gfx/weapons/keris.tga");
-R_InitTexture(melee[6], "gfx/weapons/knight_sword.tga");
-R_InitTexture(melee[7], "gfx/weapons/fangblade.tga");
-R_InitTexture(melee[8], "gfx/weapons/dual_knife.tga");
-R_InitTexture(melee[9], "gfx/weapons/combat.tga");
-R_InitTexture(melee[10], "gfx/weapons/amok.tga");
-R_InitTexture(melee[11], "gfx/weapons/bone_knife.tga");
-R_InitTexture(melee[12], "gfx/weapons/brass_knuckle.tga");
-R_InitTexture(melee[13], "gfx/weapons/butterfly.tga");
-R_InitTexture(melee[14], "gfx/weapons/candy_cane.tga");
-R_InitTexture(melee[15], "gfx/weapons/arabian_sword.tga");
+R_InitTexture(melee[0], "gfx/billflx/weapons/wpn_empty.png");
+R_InitTexture(melee[1], "gfx/billflx/weapons/saber.png");
+R_InitTexture(melee[2], "gfx/billflx/weapons/miniaxe.png");
+R_InitTexture(melee[3], "gfx/billflx/weapons/m7.png");
+R_InitTexture(melee[4], "gfx/billflx/weapons/karambit.png");
+R_InitTexture(melee[5], "gfx/billflx/weapons/keris.png");
+R_InitTexture(melee[6], "gfx/billflx/weapons/knight_sword.png");
+R_InitTexture(melee[7], "gfx/billflx/weapons/fangblade.png");
+R_InitTexture(melee[8], "gfx/billflx/weapons/dual_knife.png");
+R_InitTexture(melee[9], "gfx/billflx/weapons/combat.png");
+R_InitTexture(melee[10], "gfx/billflx/weapons/amok.png");
+R_InitTexture(melee[11], "gfx/billflx/weapons/bone_knife.png");
+R_InitTexture(melee[12], "gfx/billflx/weapons/brass_knuckle.png");
+R_InitTexture(melee[13], "gfx/billflx/weapons/butterfly.png");
+R_InitTexture(melee[14], "gfx/billflx/weapons/candy_cane.png");
+R_InitTexture(melee[15], "gfx/billflx/weapons/arabian_sword.png");
 
-R_InitTexture(explosive[0], "gfx/weapons/wpn_empty.tga");
-R_InitTexture(explosive[1], "gfx/weapons/k400.tga");
-R_InitTexture(explosive[2], "gfx/weapons/gasbomb.tga");
-R_InitTexture(explosive[3], "gfx/weapons/gasbomb.tga");
-R_InitTexture(explosive[4], "gfx/weapons/gasbomb.tga");
+R_InitTexture(explosive[0], "gfx/billflx/weapons/wpn_empty.png");
+R_InitTexture(explosive[1], "gfx/billflx/weapons/k400.png");
+R_InitTexture(explosive[2], "gfx/billflx/weapons/gasbomb.png");
+R_InitTexture(explosive[3], "gfx/billflx/weapons/gasbomb.png");
+R_InitTexture(explosive[4], "gfx/billflx/weapons/gasbomb.png");
 
-R_InitTexture(special[0], "gfx/weapons/wpn_empty.tga");
-R_InitTexture(special[1], "gfx/weapons/smoke.tga");
-R_InitTexture(special[2], "gfx/weapons/medkit.tga");
-R_InitTexture(special[3], "gfx/weapons/medkit.tga");
-R_InitTexture(special[4], "gfx/weapons/medkit.tga");
-*/
+R_InitTexture(special[0], "gfx/billflx/weapons/wpn_empty.png");
+R_InitTexture(special[1], "gfx/billflx/weapons/smoke.png");
+R_InitTexture(special[2], "gfx/billflx/weapons/medkit.png");
+R_InitTexture(special[3], "gfx/billflx/weapons/medkit.png");
+R_InitTexture(special[4], "gfx/billflx/weapons/medkit.png");
+
 return 1;
 }
 
 int CHudInventoryUi::Draw( float flTime )
 {
-/*int x = ScreenWidth / 2;
+	int x = ScreenWidth / 2;
+	int xr = ScreenWidth / 1.58;
+	int xl = ScreenWidth / 2;
 
-int xr = ScreenWidth / 1.58;
-int xl = ScreenWidth / 2;
+	int primXPos = 0;
 
-int primXPos, secXPos, meleeXPos, grenXPos, speXPos;
-int primYPos, secYPos, meleeYPos, grenYPos, speYPos;
+	if (ScreenHeight <= 600) primXPos = 110;
+	else if (ScreenHeight <= 700) primXPos = 130;
+	else if (ScreenHeight <= 800) primXPos = 160;
+	else if (ScreenHeight <= 900) primXPos = 190;
+	else if (ScreenHeight <= 1100) primXPos = 220;
+	else if (ScreenHeight <= 1500) primXPos = 310;
+	else if (ScreenHeight <= 2500) primXPos = 330;
 
-if (ScreenHeight <= 600)
-{
-primXPos = 110;
-}
-else if (ScreenHeight <= 700)
-{
-primXPos = 130;
-}
-else if (ScreenHeight <= 800)
-{
-primXPos = 160;
-}
-else if (ScreenHeight <= 900)
-{
-primXPos = 190;
-}
-else if (ScreenHeight <= 1100)
-{
-primXPos = 220;
-}
-else if (ScreenHeight <= 1500)
-{
-primXPos = 310;
-}
-else if (ScreenHeight <= 2500)
-{
-primXPos = 330;
-}
+	if (open)
+	{
+		//bg
+		gEngfuncs.pTriAPI->RenderMode(kRenderTransAlpha);
+		gEngfuncs.pTriAPI->Color4ub(255, 255, 255, 255);
+		bg->Bind();
+		DrawUtils::Draw2DQuadScaled(x - 1000 / 2, 0, x + 1000 / 2, ScreenHeight);
 
-if (open)
-{
-
-//bg
-gEngfuncs.pTriAPI->RenderMode(kRenderTransAlpha);
-gEngfuncs.pTriAPI->Color4ub(255, 255, 255, 255);
-bg->Bind();
-DrawUtils::Draw2DQuadScaled(x - 1000 / 2,0, x + 1000 / 2, ScreenHeight);
-
-
-if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "none") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "tdm"))
-{
-
-//if (gHUD.inventory_primary->value == 1)
-//{
-
-primary[1]->Bind();//current 
-DrawUtils::Draw2DQuadScaled(x - 300 / 2, primXPos, x + 300 / 2, primXPos + 100);
-
-primary[2]->Bind();//next
-DrawUtils::Draw2DQuadScaled(xr - 300 / 2, primXPos + 10, xr + 300 / 2, primXPos + 100 + 10);
-
-//primary[59]->Bind();//prev
-//DrawUtils::Draw2DQuadScaled(x - 600 / 2, primPos, x + 1 / 2, primPos + 100);
-
-//}
-
-
-}
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sg") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "sgb"))
-{
-
-}
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sniper") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "sniperB"))
-{
-
-}
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "knife") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "knifeB"))
-{
-
-}
-
-}*/
-return 1;
+		if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "none") || !strcmp(CVAR_GET_STRING("mp_gamemode"), "tdm"))
+		{
+			// Render weapons if they exist
+			if (primary[1]) {
+				primary[1]->Bind();
+				DrawUtils::Draw2DQuadScaled(x - 300 / 2, primXPos, x + 300 / 2, primXPos + 100);
+			}
+			if (primary[2]) {
+				primary[2]->Bind();
+				DrawUtils::Draw2DQuadScaled(xr - 300 / 2, primXPos + 10, xr + 300 / 2, primXPos + 100 + 10);
+			}
+		}
+	}
+	return 1;
 }

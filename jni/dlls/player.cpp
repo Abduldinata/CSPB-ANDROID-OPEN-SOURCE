@@ -18,6 +18,8 @@
 #include "game.h"
 #include "hltv.h"
 #include "pm_shared.h"
+#include "effects.h"
+#include "func_tank.h"
 #include "studio.h"
 #include "globals.h"
 #include "revert_saved.h"
@@ -98,7 +100,7 @@ TYPEDESCRIPTION CBasePlayer::m_playerSaveData[] =
 	DEFINE_FIELD(CBasePlayer, m_fLongJump, FIELD_BOOLEAN),
 	DEFINE_FIELD(CBasePlayer, m_fInitHUD, FIELD_BOOLEAN),
 	DEFINE_FIELD(CBasePlayer, m_tbdPrev, FIELD_TIME),
-	DEFINE_FIELD(CBasePlayer, m_pTank, FIELD_EHANDLE),
+	DEFINE_FIELD(CBasePlayer, m_pActiveTank, FIELD_EHANDLE),
 	DEFINE_FIELD(CBasePlayer, m_iHideHUD, FIELD_INTEGER),
 	DEFINE_FIELD(CBasePlayer, m_iFOV, FIELD_INTEGER),
 	DEFINE_FIELD(CBasePlayer, m_flDisplayHistory, FIELD_INTEGER),
@@ -1029,6 +1031,18 @@ int CBasePlayer::TakeDamage(entvars_t *pevInflictor, entvars_t *pevAttacker, flo
 		return 0;
 	}
 
+	// Assist tracking (server-side): last damager within a short window.
+	// Used to award "assist" when someone else gets the kill.
+	if (pAttacker && pAttacker->IsPlayer())
+	{
+		auto *pAttackerPlayer = static_cast<CBasePlayer *>(pAttacker);
+		if (pAttackerPlayer != this && pAttackerPlayer->m_iTeam != m_iTeam)
+		{
+			m_iLastAssistAttacker = ENTINDEX(pAttackerPlayer->edict());
+			m_flLastAssistTime = gpGlobals->time;
+		}
+	}
+
 	if (bitsDamageType & DMG_BLAST && g_pGameRules->IsMultiplayer())
 	{
 		// blasts damage armor more.
@@ -1818,10 +1832,10 @@ MESSAGE_END();
 		}
 	}
 
-	if (m_pTank != NULL)
+	if (m_pActiveTank != NULL)
 	{
-		m_pTank->Use(this, this, USE_OFF, 0);
-		m_pTank = NULL;
+		m_pActiveTank->Use(this, this, USE_OFF, 0);
+		m_pActiveTank = NULL;
 	}
 
 	CSound *pSound = CSoundEnt::SoundPointerForIndex(CSoundEnt::ClientSoundIndex(edict()));
@@ -3299,10 +3313,10 @@ void CBasePlayer::JoiningThink()
 }
 void CBasePlayer::Disappear()
 {
-	if (m_pTank != NULL)
+	if (m_pActiveTank != NULL)
 	{
-		m_pTank->Use(this, this, USE_OFF, 0);
-		m_pTank = NULL;
+		m_pActiveTank->Use(this, this, USE_OFF, 0);
+		m_pActiveTank = NULL;
 	}
 
 	CSound *pSound = CSoundEnt::SoundPointerForIndex(CSoundEnt::ClientSoundIndex(edict()));
@@ -3456,9 +3470,9 @@ void CBasePlayer::PlayerDeathThink()
 void CBasePlayer::RoundRespawn()
 {
 
-pev->round_frags = 0;
-pev->round_frags_sniper = 0;
-pev->round_frags_headshot = 0;
+round_frags = 0;
+round_frags_sniper = 0;
+round_frags_headshot = 0;
 
 	m_canSwitchObserverModes = true;
 
@@ -3524,10 +3538,10 @@ void CBasePlayer::StartObserver(Vector vecPosition, Vector vecViewAngle)
 	if (m_pActiveItem != NULL)
 		m_pActiveItem->Holster();
 
-	if (m_pTank != NULL)
+	if (m_pActiveTank != NULL)
 	{
-		m_pTank->Use(this, this, USE_OFF, 0);
-		m_pTank = NULL;
+		m_pActiveTank->Use(this, this, USE_OFF, 0);
+		m_pActiveTank = NULL;
 	}
 
 
@@ -3639,12 +3653,12 @@ void CBasePlayer::PlayerUse()
 	// Hit Use on a train?
 	if (m_afButtonPressed & IN_USE)
 	{
-		if (m_pTank != NULL)
+		if (m_pActiveTank != NULL)
 		{
 			// Stop controlling the tank
 			// TODO: Send HUD Update
-			m_pTank->Use(this, this, USE_OFF, 0);
-			m_pTank = NULL;
+			m_pActiveTank->Use(this, this, USE_OFF, 0);
+			m_pActiveTank = NULL;
 			return;
 		}
 
@@ -4548,19 +4562,21 @@ void CBasePlayer::PostThink()
 		goto pt_end;
 
 	// Handle Tank controlling
-	if (m_pTank != NULL)
+	if (m_pActiveTank != NULL)
 	{
+		CFuncTank *pTank = (CFuncTank *)((CBaseEntity *)m_pActiveTank);
+
 		// if they've moved too far from the gun,  or selected a weapon, unuse the gun
-		if (m_pTank->OnControls(pev) && !pev->weaponmodel)
+		if (pTank->OnControls(pev) && !pev->weaponmodel)
 		{
 			// try fire the gun
-			m_pTank->Use(this, this, USE_SET, 2);
+			pTank->Use(this, this, USE_SET, 2);
 		}
 		else
 		{
 			// they've moved off the platform
-			m_pTank->Use(this, this, USE_OFF, 0);
-			m_pTank = NULL;
+			pTank->Use(this, this, USE_OFF, 0);
+			m_pActiveTank = NULL;
 		}
 	}
 
@@ -4766,15 +4782,19 @@ VictimKilled = 0;
 
 	//pev->health = 0;
 
-pev->round_frags = 0;
-pev->round_frags_sniper = 0;
-pev->round_frags_headshot = 0;
+round_frags = 0;
+round_frags_sniper = 0;
+round_frags_headshot = 0;
+m_bFirstShotAfterRespawn = true;
+m_iKillLead = 0;
+m_iLastAssistAttacker = 0;
+m_flLastAssistTime = 0.0f;
 
 //player health player 
 pev->health = 100;
 
-pev->round_frags = 0;
-pev->round_frags_headshot = 0;
+round_frags = 0;
+round_frags_headshot = 0;
 
 pev->body = 0;
 
@@ -6127,7 +6147,7 @@ void CBasePlayer::ItemPostFrame()
 	static int fInSelect = FALSE;
 
 	// check if the player is using a tank
-	if (m_pTank != NULL)
+	if (m_pActiveTank != NULL)
 		return;
 
 	if (m_pActiveItem != NULL)
@@ -6149,7 +6169,12 @@ void CBasePlayer::ItemPostFrame()
 	ImpulseCommands();
 
 	if (m_pActiveItem != NULL)
+	{
 		m_pActiveItem->ItemPostFrame();
+
+		if (m_afButtonPressed & IN_ATTACK)
+			m_bFirstShotAfterRespawn = false;
+	}
 }
 
 int CBasePlayer::AmmoInventory(int iAmmoIndex)

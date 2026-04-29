@@ -1359,6 +1359,9 @@ cvar_t *m_clearkill;
 cvar_t *m_pbteam;
 cvar_t *m_pbredclass;
 cvar_t *m_pbblueclass;
+cvar_t *pb_active_red_class;
+cvar_t *pb_active_blue_class;
+cvar_t *pb_active_mode;
 cvar_t *m_spectatorgui;
 cvar_t *m_respawnann;
 cvar_t *m_laser;
@@ -1409,6 +1412,10 @@ cvar_t *inventory_secondary;
 cvar_t *inventory_melee;
 cvar_t *inventory_explosive;
 cvar_t *inventory_special;
+
+// Inventory restriction profile (lobby-side enforced rules):
+// examples: default, sniperonly, sgonly, meleeonly, primaryonly
+cvar_t *inv_profile;
 
 cvar_t *weaponName;
 

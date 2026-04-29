@@ -436,10 +436,11 @@ int CHudAmmo::VidInit(void)
 	}
 
 //pb stuff
-R_InitTexture(pb_crosshair[0], "gfx/billflx/crosshair/crosshair_laser.tga");
-R_InitTexture(pb_crosshair[1], "gfx/billflx/crosshair/crosshair_default.tga");
-R_InitTexture(pb_crosshair[2], "gfx/billflx/crosshair/crosshair_grenade.tga");
-R_InitTexture(pb_crosshair[3], "gfx/billflx/crosshair/crosshair_default.tga");
+// Crosshair textures live under `files/cspb/gfx/sight/crosshair/`.
+R_InitTexture(pb_crosshair[0], "gfx/sight/crosshair/crosshair_laser.png");
+R_InitTexture(pb_crosshair[1], "gfx/sight/crosshair/crosshair_default_red.png");
+R_InitTexture(pb_crosshair[2], "gfx/sight/crosshair/crosshair_grenade.png");
+R_InitTexture(pb_crosshair[3], "gfx/sight/crosshair/crosshair_default_red.png");
 
 R_InitTexture(m_weaponbg, "gfx/billflx/garing");
 
@@ -454,15 +455,15 @@ BuildHudNumberRect(m_iNum_S_ammo, m_rcNumber_Small_ammo, 10, 10, 1, 1);
 
 R_InitTexture(weaponname_bg, "gfx/billflx/bg_weapon");
 
-R_InitTexture(m_specials[0], "gfx/billflx/equip/gren0.tga");
-R_InitTexture(m_specials[1], "gfx/billflx/equip/gren1.tga");
-R_InitTexture(m_specials[2], "gfx/billflx/equip/gren2.tga");
-R_InitTexture(m_specials[3], "gfx/billflx/equip/med0.tga");
-R_InitTexture(m_specials[4], "gfx/billflx/equip/med1.tga");
-R_InitTexture(m_specials[5], "gfx/billflx/equip/med2.tga");
-R_InitTexture(m_specials[6], "gfx/billflx/equip/smoke0.tga");
-R_InitTexture(m_specials[7], "gfx/billflx/equip/smoke1.tga");
-R_InitTexture(m_specials[8], "gfx/billflx/equip/smoke2.tga");
+R_InitTexture(m_specials[0], "gfx/billflx/equip/gren0.png");
+R_InitTexture(m_specials[1], "gfx/billflx/equip/gren1.png");
+R_InitTexture(m_specials[2], "gfx/billflx/equip/gren2.png");
+R_InitTexture(m_specials[3], "gfx/billflx/equip/med0.png");
+R_InitTexture(m_specials[4], "gfx/billflx/equip/med1.png");
+R_InitTexture(m_specials[5], "gfx/billflx/equip/med2.png");
+R_InitTexture(m_specials[6], "gfx/billflx/equip/smoke0.png");
+R_InitTexture(m_specials[7], "gfx/billflx/equip/smoke1.png");
+R_InitTexture(m_specials[8], "gfx/billflx/equip/smoke2.png");
 
 	return 1;
 }

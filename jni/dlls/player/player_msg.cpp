@@ -131,6 +131,12 @@ int gmsgSlugger = 0;
 int gmsgPointNumber = 0;
 int gmsgFadeViewModel = 0;
 
+int gmsgSpecialGunner = 0;
+int gmsgBombShot = 0;
+int gmsgoneShot = 0;
+int gmsgPiercingShot = 0;
+int gmsgMassKill = 0;
+
 int gmsgFragAnimKill = 0;
 int gmsgFragAnimHs = 0;
 int gmsgFragAnimStopper = 0;
@@ -365,16 +371,22 @@ gmsgChainHeadshot = REG_USER_MSG("ChainHeadshot", -1);
 gmsgHelmet = REG_USER_MSG("Helmet", -1);
 gmsgStopper = REG_USER_MSG("Stopper", -1);
 gmsgSlugger = REG_USER_MSG("Slugger", -1);
-gmsgPointNumber = REG_USER_MSG("PointNumber", -1);
-gmsgFadeViewModel = REG_USER_MSG("FadeViewModel", -1);
+	gmsgPointNumber = REG_USER_MSG("PointNumber", -1);
+	gmsgFadeViewModel = REG_USER_MSG("FadeViewModel", -1);
+
+	gmsgSpecialGunner = REG_USER_MSG("SpecialGunner", -1);
+	gmsgBombShot = REG_USER_MSG("BombShot", -1);
+	gmsgoneShot = REG_USER_MSG("oneShot", -1);
+	gmsgPiercingShot = REG_USER_MSG("PiercingShot", -1);
+	gmsgMassKill = REG_USER_MSG("MassKill", -1);
 
 //underneath anim stars 
-gmsgFragAnimKill = REG_USER_MSG("FragAnimKill", -1);
-gmsgFragAnimHs = REG_USER_MSG("FragAnimHs", -1);
-gmsgFragAnimStopper = REG_USER_MSG("FragAnimStopper", -1);
-gmsgFragAnimStopperHs = REG_USER_MSG("FragAnimStopperHs", -1);
-gmsgFragAnimBlue = REG_USER_MSG("FragAnimBlue", -1);
-gmsgFragAnimGold = REG_USER_MSG("FragAnimGold", -1);
+	gmsgFragAnimKill = REG_USER_MSG("FragAnimKill", -1);
+	gmsgFragAnimHs = REG_USER_MSG("FragAnimHs", -1);
+	gmsgFragAnimStopper = REG_USER_MSG("FragAnimStopper", -1);
+	gmsgFragAnimStopperHs = REG_USER_MSG("FragAnimStopperHs", -1);
+	gmsgFragAnimBlue = REG_USER_MSG("FragAnimBlue", -1);
+	gmsgFragAnimGold = REG_USER_MSG("FragAnimGold", -1);
 
 gmsgReddot = REG_USER_MSG("Reddot_Scope", -1);
 gmsgEotech = REG_USER_MSG("Eotech_Scope", -1);
@@ -390,6 +402,7 @@ gmsgEotechDot = REG_USER_MSG("EotechDot_Scope", -1);
 
 //specific stars for kill
 
+#if 0 // Disabled: legacy HUD star positioning system (exceeded MAX_USER_MESSAGES on client)
 gmsgKillStar1 = REG_USER_MSG("KillStar1", -1);
 gmsgKillStar2 = REG_USER_MSG("KillStar2", -1);
 gmsgKillStar3 = REG_USER_MSG("KillStar3", -1);
@@ -462,6 +475,7 @@ gmsgSluggerHsStar10 = REG_USER_MSG("SluggerHsStar10", -1);
 */
 gmsgPos1 = REG_USER_MSG("Pos1", -1);
 gmsgPos2 = REG_USER_MSG("Pos2", -1);
+#endif
 
 gmsgHeadName = REG_USER_MSG("HeadName", -1);
 

@@ -88,15 +88,15 @@ void CHudTimer::Reset(void)
 int CHudTimer::VidInit()
 {
 	m_HUD_timer = gHUD.GetSpriteIndex( "stopwatch" );
-	R_InitTexture(m_pTexture_Black, "gfx/billflx/timerbg");
+	R_InitTexture(m_pTexture_Black, "gfx/billflx/timerbg.png");
 //R_InitTexture(m_pTexture_Blackevo, "materials/pb/hud/evo/timerbg");
 
 
 m_iNum_L = gHUD.GetSpriteIndex("SBNum_L");
 BuildHudNumberRect(m_iNum_L, m_rcNumber_Large, 13, 13, 1, 1);
 
-R_InitTexture(m_respawning, "materials/pb/hud/respawning");
-R_InitTexture(m_c4_bg, "gfx/billflx/c4_timer");
+R_InitTexture(m_respawning, "gfx/billflx/ui/respawning.png");
+R_InitTexture(m_c4_bg, "gfx/billflx/c4_timer.png");
 
 	return 1;
 }

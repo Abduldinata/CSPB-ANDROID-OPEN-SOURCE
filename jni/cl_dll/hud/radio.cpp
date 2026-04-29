@@ -244,11 +244,11 @@ HOOK_COMMAND("healthbar", CommandActiveHealthBar); //Unlabeled
 int CHudHealthbar::VidInit()
 {
 
-R_InitTexture(m_sniper, "materials/pb/hud/icon/sniper.tga");
-R_InitTexture(m_rifle, "materials/pb/hud/icon/assault.tga");
-R_InitTexture(m_shotgun, "materials/pb/hud/icon/shotgun.tga");
-R_InitTexture(m_pistol, "materials/pb/hud/icon/pistol.tga");
-//R_InitTexture(m_healthbar, "materials/pb/hud/icon/.tga");
+R_InitTexture(m_sniper, "gfx/billflx/icon/sniper.png");
+R_InitTexture(m_rifle, "gfx/billflx/icon/assault.png");
+R_InitTexture(m_shotgun, "gfx/billflx/icon/shotgun.png");
+R_InitTexture(m_pistol, "gfx/billflx/icon/pistol.png");
+//R_InitTexture(m_healthbar, "gfx/billflx/icon/.png");
 
 return 1;
 }

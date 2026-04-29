@@ -130,7 +130,7 @@ static MoEWeaponBuyInfo_s g_MoEWeaponBuyInfo[] = {
 { "weapon_deagle", "deagle", 5, PISTOL_SLOT, UNASSIGNED },
 { "weapon_usp", "usp", 5, PISTOL_SLOT, UNASSIGNED },
 { "weapon_glock18", "glock", 5, PISTOL_SLOT, UNASSIGNED },
-{ "weapon_bow", "bow", 5, PISTOL_SLOT, UNASSIGNED },
+{ "weapon_compound_bow", "bow", 5, PISTOL_SLOT, UNASSIGNED },
 
 
 { "weapon_ak47", "ak47", 6, PRIMARY_WEAPON_SLOT, UNASSIGNED },
@@ -139,7 +139,7 @@ static MoEWeaponBuyInfo_s g_MoEWeaponBuyInfo[] = {
 { "weapon_aug", "aug", 6, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 { "weapon_awp", "awp", 6, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 { "weapon_aug_hbar", "aug hbar", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
-{ "weapon_augblitz", "AUG BLITZ", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
+{ "weapon_aug_blitz", "AUG BLITZ", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 { "weapon_cheytac_m200", "cheytac m200", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 { "weapon_dragunov", "dragunov", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 { "weapon_p90", "p90", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
@@ -193,7 +193,7 @@ static MoEWeaponBuyInfo_s g_MoEWeaponBuyInfo[] = {
 { "weapon_ump", "ump", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 { "weapon_sig", "sig", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 { "weapon_spectre", "spectre", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
-{ "weapon_tar", "tar21", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
+{ "weapon_tar21", "tar21", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 { "weapon_xm8", "xm8", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 { "weapon_water", "watergun", 5, PRIMARY_WEAPON_SLOT, UNASSIGNED },
 
@@ -206,14 +206,14 @@ static MoEWeaponBuyInfo_s g_MoEWeaponBuyInfo[] = {
 { "weapon_arabian_sword", "arabian sword", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_fangblade", "fangblade Knife", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_combat", "combat machete", 0, KNIFE_SLOT, UNASSIGNED },
-{ "weapon_knifebone", "bone Knife", 0, KNIFE_SLOT, UNASSIGNED },
+{ "weapon_knife_bone", "bone Knife", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_brass_knuckle", "brass knuckle", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_candy_cane", "candy cane", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_dual_knife", "dual knife", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_keris", "keris", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_mini_axe", "mini axe", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_knife", "knife", 0, KNIFE_SLOT, UNASSIGNED },
-{ "weapon_ice", "ice fork", 0, KNIFE_SLOT, UNASSIGNED },
+{ "weapon_ice_fork", "ice fork", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_karambit", "karambit", 0, KNIFE_SLOT, UNASSIGNED },
 { "weapon_butterfly", "butterfly", 0, KNIFE_SLOT, UNASSIGNED },
 
@@ -231,14 +231,27 @@ bool MoE_HandleBuyCommands(CBasePlayer *pPlayer, const char *pszCommand)
 	if (!pPlayer->CanPlayerBuy(true))
 		return false;
 
-	if (HasPlayerItem(pPlayer, pszCommand))
+	// Compatibility aliases:
+	// Some UI/assets/scripts use v20-ish IDs (matching `gfx/billflx/weapons/weapon_<id>.png`)
+	// while the v16 weapon class name in `wpn_shared` may differ.
+	const char *resolvedCmd = pszCommand;
+	if (pszCommand)
+	{
+		if (!strcmp(pszCommand, "weapon_augblitz")) resolvedCmd = "weapon_aug_blitz";
+		else if (!strcmp(pszCommand, "weapon_tar")) resolvedCmd = "weapon_tar21";
+		else if (!strcmp(pszCommand, "weapon_bow")) resolvedCmd = "weapon_compound_bow";
+		else if (!strcmp(pszCommand, "weapon_ice")) resolvedCmd = "weapon_ice_fork";
+		else if (!strcmp(pszCommand, "weapon_knifebone")) resolvedCmd = "weapon_knife_bone";
+	}
+
+	if (HasPlayerItem(pPlayer, resolvedCmd))
 	{
 		return false;
 	}
 		
 	auto iter = std::find_if(std::begin(g_MoEWeaponBuyInfo), std::end(g_MoEWeaponBuyInfo), 
-		[pszCommand](const MoEWeaponBuyInfo_s &info) {
-			return !strcmp(info.pszClassName, pszCommand);
+		[resolvedCmd](const MoEWeaponBuyInfo_s &info) {
+			return !strcmp(info.pszClassName, resolvedCmd);
 		}
 	);
 
