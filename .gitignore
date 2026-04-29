@@ -1,0 +1,13 @@
+# Build outputs (NDK)
+obj/
+libs/
+
+# Local APK extraction / reverse-engineering artifacts
+apk_extracted/
+
+# Local logs / diagnostics
+*.log
+*.tmp
+build_output*.txt
+build_errors*.txt
+
