@@ -19,6 +19,7 @@
 #include "player.h"
 #include "weapons.h"
 #include "game.h"
+#include "model_helper.h"
 #include "wpn_p90.h"
 
 enum p90_e
@@ -37,6 +38,13 @@ ANIM4,
 ANIM5
 };
 
+// Future asset note:
+// - preferred world model: models/w_p90_a3.mdl
+// - temporary CSPB firearm-like fallback: models/w_ak47_fc_bomb.mdl
+// There is no loose CSPB w_p90 asset yet, so this keeps a weapon-shaped W model loaded for now.
+static const char* kP90WorldModel = "models/w_p90_a3.mdl";
+static const char* kP90WorldFallback = "models/w_ak47_fc_bomb.mdl";
+
 
 
 
@@ -48,7 +56,7 @@ void CP90::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GALIL;
-	SET_MODEL(ENT(pev), "models/w_p90_a3.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_MODEL_OR_FALLBACK(kP90WorldModel, kP90WorldFallback));
 
 	m_iDefaultAmmo = P90_DEFAULT_GIVE;
 	m_flAccuracy = 0.2;
@@ -62,7 +70,7 @@ void CP90::Precache(void)
 	
 PRECACHE_MODEL("models/billflx/v_p90.mdl");
 
-	PRECACHE_MODEL("models/w_p90_a3.mdl");
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kP90WorldModel, kP90WorldFallback));
 
 
 	PRECACHE_SOUND("weapons/p90-1.wav");

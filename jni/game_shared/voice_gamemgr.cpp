@@ -42,6 +42,9 @@ void VoiceServerDebug(const char *pFmt, ...)
 /* <2d3cd1> ../game_shared/voice_gamemgr.cpp:89 */
 CVoiceGameMgr::CVoiceGameMgr()
 {
+	m_msgPlayerVoiceMask = 0;
+	m_msgRequestState = 0;
+	m_pHelper = NULL;
 	m_UpdateInterval = 0;
 	m_nMaxPlayers = 0;
 }
@@ -58,10 +61,20 @@ bool CVoiceGameMgr::Init(IVoiceGameMgrHelper *pHelper, int maxClients)
 	m_pHelper = pHelper;
 	m_nMaxPlayers = (maxClients > VOICE_MAX_PLAYERS) ? VOICE_MAX_PLAYERS : maxClients;
 
+	// Some gameplay modes construct a derived rules object after CHalfLifeMultiplay
+	// has already initialized voice once. Reusing the existing user-message IDs is
+	// safer than running the whole startup path twice during listen-server map load.
+	if (m_msgPlayerVoiceMask != 0 && m_msgRequestState != 0)
+	{
+		CSPB_LOG_DIAG("[VOICEGM] duplicate init skipped");
+		return true;
+	}
+
 	PRECACHE_MODEL("sprites/voiceicon.spr");
 
 	m_msgPlayerVoiceMask = REG_USER_MSG("VoiceMask", VOICE_MAX_PLAYERS_DW * 4 * 2);
 	m_msgRequestState = REG_USER_MSG("ReqState", 0);
+	CSPB_LOG_DIAG("[VOICEGM] init complete mask=%d req=%d max=%d", m_msgPlayerVoiceMask, m_msgRequestState, m_nMaxPlayers);
 
 	// register voice_serverdebug if it hasn't been registered already
 	if (!CVAR_GET_POINTER("voice_serverdebug"))

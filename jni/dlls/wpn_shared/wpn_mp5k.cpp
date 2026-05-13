@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_mp5k.h"
 
 enum mp5k_e
@@ -56,7 +57,7 @@ void Cmp5k::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GALIL;
-	SET_MODEL(ENT(pev), "models/w_mp5k.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_mp5k.mdl"));
 
 	m_iDefaultAmmo = M4A1_DEFAULT_GIVE;
 	m_flAccuracy = 0.2;

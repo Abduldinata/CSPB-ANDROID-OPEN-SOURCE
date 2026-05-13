@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_flashbang.h"
 
 enum flashbang_e
@@ -91,7 +92,7 @@ BOOL CFlashbang::Deploy(void)
 		return DefaultDeploy("models/shield/v_shield_flashbang.mdl", "models/shield/p_shield_flashbang.mdl", FLASHBANG_DRAW, "shieldgren", UseDecrement() != FALSE);
 	else
 #endif
-		return DefaultDeploy(m_pPlayer->m_iTeam == CT ? "models/billflx/cityforce/v_medkit.mdl" : "models/billflx/rebel/v_medkit.mdl", "models/p_medkit.mdl", NULL, "grenade", UseDecrement() != FALSE);
+		return DefaultDeploy(m_pPlayer->m_iTeam == CT ? "models/billflx/cityforce/v_medkit.mdl" : "models/billflx/rebel/v_medkit.mdl", RESOLVE_MODEL_OR_FALLBACK("models/p_medkit.mdl", "models/p_flashbang.mdl"), NULL, "grenade", UseDecrement() != FALSE);
 }
 
 void CFlashbang::Holster(int skiplocal)

@@ -32,7 +32,11 @@ const char *Client_ApperanceToModel(int iApperance)
 void PlayerModel_Precache()
 {
 	for(auto psz : sPlayerModelFiles)
+	{
+		CSPB_LOG_DIAG("[PLAYERMODEL] before %s", psz);
 		PRECACHE_MODEL(const_cast<char *>(psz));
+		CSPB_LOG_DIAG("[PLAYERMODEL] done %s", psz);
+	}
 }
 
 void PlayerModel_ForceUnmodified(const Vector &vMin, const Vector &vMax)

@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "game.h"
 #include "wpn_cheytac_m200.h"
 
@@ -45,7 +46,7 @@ void CCHEYTAC::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_AWP;
-	SET_MODEL(ENT(pev), "models/w_awp.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_awp.mdl"));
 
 	m_iDefaultAmmo = AWP_DEFAULT_GIVE;
 	FallInit();

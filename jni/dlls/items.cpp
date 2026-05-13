@@ -55,6 +55,7 @@
 #include "gamerules.h"
 #include "career_tasks.h"
 #include "maprules.h"
+#include "model_helper.h"
 
 LINK_ENTITY_TO_CLASS(world_items, CWorldItem);
 
@@ -175,13 +176,13 @@ void CItem::Materialize()
 void CItemSuit::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_kevlar.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_kevlar.mdl");
 	CItem::Spawn();
 }
 
 void CItemSuit::Precache()
 {
-	PRECACHE_MODEL("models/w_kevlar.mdl");
+	SAFE_PRECACHE_MODEL("models/w_kevlar.mdl");
 	PRECACHE_SOUND("items/tr_kevlar.wav");
 }
 
@@ -203,13 +204,13 @@ LINK_ENTITY_TO_CLASS(item_suit, CItemSuit);
 void CItemBattery::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_battery.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_battery.mdl");
 	CItem::Spawn();
 }
 
 void CItemBattery::Precache()
 {
-	PRECACHE_MODEL("models/w_battery.mdl");
+	SAFE_PRECACHE_MODEL("models/w_battery.mdl");
 	PRECACHE_SOUND("items/gunpickup2.wav");
 }
 
@@ -250,13 +251,13 @@ LINK_ENTITY_TO_CLASS(item_battery, CItemBattery);
 void CItemAntidote::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_antidote.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_antidote.mdl");
 	CItem::Spawn();
 }
 
 void CItemAntidote::Precache()
 {
-	PRECACHE_MODEL("models/w_antidote.mdl");
+	SAFE_PRECACHE_MODEL("models/w_antidote.mdl");
 }
 
 BOOL CItemAntidote::MyTouch(CBasePlayer *pPlayer)
@@ -272,13 +273,13 @@ LINK_ENTITY_TO_CLASS(item_antidote, CItemAntidote);
 void CItemSecurity::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_security.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_security.mdl");
 	CItem::Spawn();
 }
 
 void CItemSecurity::Precache()
 {
-	PRECACHE_MODEL("models/w_security.mdl");
+	SAFE_PRECACHE_MODEL("models/w_security.mdl");
 }
 
 BOOL CItemSecurity::MyTouch(CBasePlayer *pPlayer)
@@ -292,13 +293,13 @@ LINK_ENTITY_TO_CLASS(item_security, CItemSecurity);
 void CItemLongJump::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_longjump.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_longjump.mdl");
 	CItem::Spawn();
 }
 
 void CItemLongJump::Precache()
 {
-	PRECACHE_MODEL("models/w_longjump.mdl");
+	SAFE_PRECACHE_MODEL("models/w_longjump.mdl");
 }
 
 BOOL CItemLongJump::MyTouch(CBasePlayer *pPlayer)
@@ -329,13 +330,13 @@ LINK_ENTITY_TO_CLASS(item_longjump, CItemLongJump);
 void CItemKevlar::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_kevlar.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_kevlar.mdl");
 	CItem::Spawn();
 }
 
 void CItemKevlar::Precache()
 {
-	PRECACHE_MODEL("models/w_kevlar.mdl");
+	SAFE_PRECACHE_MODEL("models/w_kevlar.mdl");
 }
 
 BOOL CItemKevlar::MyTouch(CBasePlayer *pPlayer)
@@ -367,13 +368,13 @@ LINK_ENTITY_TO_CLASS(item_kevlar, CItemKevlar);
 void CItemAssaultSuit::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_assault.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_assault.mdl");
 	CItem::Spawn();
 }
 
 void CItemAssaultSuit::Precache()
 {
-	PRECACHE_MODEL("models/w_assault.mdl");
+	SAFE_PRECACHE_MODEL("models/w_assault.mdl");
 }
 
 BOOL CItemAssaultSuit::MyTouch(CBasePlayer *pPlayer)
@@ -404,13 +405,13 @@ LINK_ENTITY_TO_CLASS(item_assaultsuit, CItemAssaultSuit);
 void CItemThighPack::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_thighpack.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_thighpack.mdl");
 	CItem::Spawn();
 }
 
 void CItemThighPack::Precache()
 {
-	PRECACHE_MODEL("models/w_thighpack.mdl");
+	SAFE_PRECACHE_MODEL("models/w_thighpack.mdl");
 }
 
 BOOL CItemThighPack::MyTouch(CBasePlayer *pPlayer)

@@ -5228,6 +5228,8 @@ void EXT_FUNC ServerActivate(edict_t *pEdictList, int edictCount, int clientMax)
 	int i;
 	CBaseEntity *pClass;
 
+	CSPB_LOG_DIAG("[SERVERACT] begin edictCount=%d clientMax=%d", edictCount, clientMax);
+
 	// Every call to ServerActivate should be matched by a call to ServerDeactivate
 	g_serveractive = 1;
 	EmptyEntityHashTable();
@@ -5244,36 +5246,75 @@ void EXT_FUNC ServerActivate(edict_t *pEdictList, int edictCount, int clientMax)
 		if (i < clientMax || !pEdict->pvPrivateData)
 			continue;
 
+		// Some broken map entities arrive with a tiny non-null private-data value
+		// (for example 0x210 under Houdini). Treat that as invalid and skip them
+		// instead of crashing inside CBaseEntity::Instance().
+		if ((size_t)pEdict->pvPrivateData < 0x1000)
+		{
+			const char *badClassname = pEdict->v.classname ? STRING(pEdict->v.classname) : "<null>";
+			if (!badClassname || !badClassname[0])
+				badClassname = "<empty>";
+
+			CSPB_LOG_DIAG("[SERVERACT] entity=%d classname=%s has suspicious pvPrivateData=%p, skipping", i, badClassname, pEdict->pvPrivateData);
+			continue;
+		}
+
+		const char *classname = pEdict->v.classname ? STRING(pEdict->v.classname) : "<null>";
+		if (!classname || !classname[0])
+			classname = "<empty>";
+
+		CSPB_LOG_DIAG("[SERVERACT] entity=%d classname=%s pvPrivateData=%p free=%d", i, classname, pEdict->pvPrivateData, pEdict->free ? 1 : 0);
 		pClass = CBaseEntity::Instance(pEdict);
 
 		// Activate this entity if it's got a class & isn't dormant
-		if (pClass && !(pClass->pev->flags & FL_DORMANT))
+		if (pClass && pClass->pev && !(pClass->pev->flags & FL_DORMANT))
 		{
-			AddEntityHashValue(&pEdict->v, STRING(pEdict->v.classname), CLASSNAME);
+			CSPB_LOG_DIAG("[SERVERACT] entity=%d classname=%s before AddEntityHashValue", i, classname);
+			AddEntityHashValue(&pEdict->v, classname, CLASSNAME);
+			CSPB_LOG_DIAG("[SERVERACT] entity=%d classname=%s before Activate", i, classname);
 			pClass->Activate();
+			CSPB_LOG_DIAG("[SERVERACT] entity=%d classname=%s Activate done", i, classname);
 		}
 		else
-			ALERT(at_console, "Can't instance %s\n", STRING(pEdict->v.classname));
+		{
+			if (pClass && !pClass->pev)
+				CSPB_LOG_DIAG("[SERVERACT] entity=%d classname=%s has NULL pev, skipping", i, classname);
+			else if (pClass && pClass->pev && (pClass->pev->flags & FL_DORMANT))
+				CSPB_LOG_DIAG("[SERVERACT] entity=%d classname=%s dormant, skipping", i, classname);
+			else
+				CSPB_LOG_DIAG("[SERVERACT] entity=%d classname=%s could not instance, skipping", i, classname);
+
+			ALERT(at_console, "Can't instance %s\n", classname);
+		}
 	}
 
 	// Link user messages here to make sure first client can get them...
+	CSPB_LOG_DIAG("[SERVERACT] entity activation loop done");
 	LinkUserMessages();
 	WriteSigonMessages();
 
 	if (g_pGameRules != NULL)
 	{
+		CSPB_LOG_DIAG("[SERVERACT] before CheckMapConditions");
 		g_pGameRules->CheckMapConditions();
+		CSPB_LOG_DIAG("[SERVERACT] CheckMapConditions done");
 	}
 
 	if (TheBots != NULL)
 	{
+		CSPB_LOG_DIAG("[SERVERACT] before TheBots->ServerActivate()");
 		TheBots->ServerActivate();
+		CSPB_LOG_DIAG("[SERVERACT] TheBots->ServerActivate() done");
 	}
 
 	if (g_pHostages != NULL)
 	{
+		CSPB_LOG_DIAG("[SERVERACT] before g_pHostages->ServerActivate()");
 		g_pHostages->ServerActivate();
+		CSPB_LOG_DIAG("[SERVERACT] g_pHostages->ServerActivate() done");
 	}
+
+	CSPB_LOG_DIAG("[SERVERACT] end");
 }
 
 void EXT_FUNC PlayerPreThink(edict_t *pEntity)
@@ -5572,8 +5613,14 @@ PRECACHE_SOUND(weapon_sound_deagle.string);
 PRECACHE_SOUND(weapon_sound_k5.string);
 PRECACHE_SOUND(weapon_sound_glock.string);
 
+#ifdef ANDROID
+	CSPB_LOG_DIAG("[PRECACHE] Android recovery: skipping PlayerZombie_Precache()");
+#else
 	PlayerZombie_Precache();
+#endif
+	CSPB_LOG_DIAG("[PRECACHE] Entering PlayerModel_Precache()");
 	PlayerModel_Precache();
+	CSPB_LOG_DIAG("[PRECACHE] Finished PlayerModel_Precache()");
 
 	if (g_bIsCzeroGame)
 	{
@@ -5598,29 +5645,56 @@ PRECACHE_SOUND(weapon_sound_glock.string);
 	PRECACHE_MODEL("models/p_hegrenade.mdl");
 	PRECACHE_MODEL("models/p_glock18.mdl");
 	PRECACHE_MODEL("models/p_p228.mdl");
+#ifdef __ANDROID__
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] Android recovery: skipping legacy global p_/w_ weapon tail after models/p_p228.mdl");
+#else
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_smokegrenade.mdl");
 	PRECACHE_MODEL("models/p_smokegrenade.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_usp.mdl");
 	PRECACHE_MODEL("models/p_usp.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_fiveseven.mdl");
 	PRECACHE_MODEL("models/p_fiveseven.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_knife.mdl");
 	PRECACHE_MODEL("models/p_knife.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/w_flashbang.mdl");
 	PRECACHE_MODEL("models/w_flashbang.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/w_hegrenade.mdl");
 	PRECACHE_MODEL("models/w_hegrenade.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_sg550.mdl");
 	PRECACHE_MODEL("models/p_sg550.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_g3sg1.mdl");
 	PRECACHE_MODEL("models/p_g3sg1.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_m249.mdl");
 	PRECACHE_MODEL("models/p_m249.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_m3.mdl");
 	PRECACHE_MODEL("models/p_m3.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_m4a1.mdl");
 	PRECACHE_MODEL("models/p_m4a1.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_mac10.mdl");
 	PRECACHE_MODEL("models/p_mac10.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_mp5.mdl");
 	PRECACHE_MODEL("models/p_mp5.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_ump45.mdl");
 	PRECACHE_MODEL("models/p_ump45.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_p90.mdl");
 	PRECACHE_MODEL("models/p_p90.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_scout.mdl");
 	PRECACHE_MODEL("models/p_scout.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_sg552.mdl");
 	PRECACHE_MODEL("models/p_sg552.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/w_smokegrenade.mdl");
 	PRECACHE_MODEL("models/w_smokegrenade.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_tmp.mdl");
 	PRECACHE_MODEL("models/p_tmp.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_elite.mdl");
 	PRECACHE_MODEL("models/p_elite.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_xm1014.mdl");
 	PRECACHE_MODEL("models/p_xm1014.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_galil.mdl");
 	PRECACHE_MODEL("models/p_galil.mdl");
+	CSPB_LOG_DIAG("[PRECACHE_TAIL] before models/p_famas.mdl");
 	PRECACHE_MODEL("models/p_famas.mdl");
+#endif
 
 	PRECACHE_MODEL("models/p_amok_kukri.mdl");
 	PRECACHE_MODEL("models/p_m7.mdl");
@@ -5842,6 +5916,9 @@ PRECACHE_MODEL("models/p_fangblade.mdl");
 
 	g_iShadowSprite = PRECACHE_MODEL("sprites/shadow_circle.spr");
 
+#if defined(ANDROID) || defined(__ANDROID__)
+	CSPB_LOG_DIAG("[PRECACHE] Android recovery: skipping optional smoke/effect sprite tail");
+#else
 	PRECACHE_MODEL("sprites/wall_puff1.spr");
 	PRECACHE_MODEL("sprites/wall_puff2.spr");
 	PRECACHE_MODEL("sprites/wall_puff3.spr");
@@ -5857,6 +5934,7 @@ PRECACHE_MODEL("models/p_fangblade.mdl");
 	PRECACHE_MODEL("sprites/rifle_smoke1.spr");
 	PRECACHE_MODEL("sprites/rifle_smoke2.spr");
 	PRECACHE_MODEL("sprites/rifle_smoke3.spr");
+#endif
 	PRECACHE_GENERIC("sprites/scope_arc.tga");
 	PRECACHE_GENERIC("sprites/scope_arc_nw.tga");
 	PRECACHE_GENERIC("sprites/scope_arc_ne.tga");

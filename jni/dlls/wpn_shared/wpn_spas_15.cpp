@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_spas_15.h"
 
 enum xm1014_e
@@ -43,7 +44,7 @@ void CSpas_15::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_XM1014;
-	SET_MODEL(ENT(pev), "models/w_xm1014.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_xm1014.mdl"));
 
 	m_iDefaultAmmo = XM1014_DEFAULT_GIVE;
 

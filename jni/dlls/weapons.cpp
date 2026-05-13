@@ -11,6 +11,7 @@
 #include "hltv.h"
 #include "globals.h"
 #include "game.h"
+#include "model_helper.h"
 
 #include "pm_shared.h"
 #include "utllinkedlist.h"
@@ -292,6 +293,7 @@ void AddAmmoNameToAmmoRegistry(const char *szAmmoname)
 
 void UTIL_PrecacheOtherWeapon(const char *szClassname)
 {
+	CSPB_LOG_DIAG("[CSPB] UTIL_PrecacheOtherWeapon: %s", szClassname);
 	edict_t *pent = CREATE_NAMED_ENTITY(MAKE_STRING(szClassname));
 
 	if (FNullEnt(pent))
@@ -307,9 +309,12 @@ void UTIL_PrecacheOtherWeapon(const char *szClassname)
 		ItemInfo II;
 		Q_memset(&II, 0, sizeof(II));
 
+		CSPB_LOG_DIAG("[CSPB] Calling pEntity->Precache() for %s", szClassname);
 		pEntity->Precache();
+		CSPB_LOG_DIAG("[CSPB] pEntity->Precache() DONE for %s", szClassname);
 		if (((CBasePlayerItem *)pEntity)->GetItemInfo(&II))
 		{
+
 			CBasePlayerItem::ItemInfoArray[ II.iId ] = II;
 
 			if (II.pszAmmo1 != NULL && *II.pszAmmo1 != '\0')
@@ -1245,9 +1250,13 @@ BOOL CBasePlayerWeapon::DefaultDeploy(const char *szViewModel, const char *szWea
 	if (!CanDeploy())
 		return FALSE;
 
+	// TRIGGER LAZY PRECACHE: Load the real HD models now that the weapon is actually being used.
+	// Outside startup phase, CSPB_PrecacheModel_Cuek will return the real model.
+	//PRECACHE_MODEL(szViewModel);
+	//PRECACHE_MODEL(szWeaponModel);
+
 	m_pPlayer->TabulateAmmo();
 	m_pPlayer->pev->viewmodel = MAKE_STRING(szViewModel);
-
 	m_pPlayer->pev->weaponmodel = MAKE_STRING(szWeaponModel);
 
 CLIENT_COMMAND(m_pPlayer->edict(), "updateitem\n");
@@ -1261,6 +1270,7 @@ MESSAGE_END();
 	model_name = m_pPlayer->pev->viewmodel;
 	Q_strcpy(m_pPlayer->m_szAnimExtention, szAnimExt);
 	SendWeaponAnim(iAnim, 0);
+
 
 	m_pPlayer->m_flNextAttack = 0.75f;
 	m_flTimeWeaponIdle = 1.5f;
@@ -1569,7 +1579,7 @@ IMPLEMENT_SAVERESTORE(CWeaponBox, CBaseEntity);
 
 void CWeaponBox::Precache()
 {
-	PRECACHE_MODEL("models/w_weaponbox.mdl");
+	SAFE_PRECACHE_MODEL("models/w_weaponbox.mdl");
 }
 
 void CWeaponBox::KeyValue(KeyValueData *pkvd)
@@ -1627,7 +1637,7 @@ void CWeaponBox::Spawn()
 	m_bIsBomb = false;
 
 	UTIL_SetSize(pev, g_vecZero, g_vecZero);
-	SET_MODEL(ENT(pev), "models/w_weaponbox.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_weaponbox.mdl");
 }
 
 // CWeaponBox - Kill - the think function that removes the
@@ -2081,10 +2091,10 @@ void CArmoury::Spawn()
 	case ARMOURY_M249:		SET_MODEL(ENT(pev), "models/w_m249.mdl"); break;
 	case ARMOURY_FLASHBANG:		SET_MODEL(ENT(pev), "models/w_flashbang.mdl"); break;
 	case ARMOURY_HEGRENADE:		SET_MODEL(ENT(pev), "models/w_hegrenade.mdl"); break;
-	case ARMOURY_KEVLAR:		SET_MODEL(ENT(pev), "models/w_kevlar.mdl"); break;
-	case ARMOURY_ASSAULT:		SET_MODEL(ENT(pev), "models/w_assault.mdl"); break;
+	case ARMOURY_KEVLAR:		SAFE_SET_MODEL(ENT(pev), "models/w_kevlar.mdl"); break;
+	case ARMOURY_ASSAULT:		SAFE_SET_MODEL(ENT(pev), "models/w_assault.mdl"); break;
 	case ARMOURY_SMOKEGRENADE:	SET_MODEL(ENT(pev), "models/w_smokegrenade.mdl"); break;
-	default:			SET_MODEL(ENT(pev), "models/w_kevlar.mdl"); break;
+	default:			SAFE_SET_MODEL(ENT(pev), "models/w_kevlar.mdl"); break;
 	}
 
 	if (m_iCount <= 0)
@@ -2171,10 +2181,10 @@ void CArmoury::Precache()
 	case ARMOURY_M249:		PRECACHE_MODEL("models/w_m249.mdl"); break;
 	case ARMOURY_FLASHBANG:		PRECACHE_MODEL("models/w_flashbang.mdl"); break;
 	case ARMOURY_HEGRENADE:		PRECACHE_MODEL("models/w_hegrenade.mdl"); break;
-	case ARMOURY_KEVLAR:		PRECACHE_MODEL("models/w_kevlar.mdl"); break;
-	case ARMOURY_ASSAULT:		PRECACHE_MODEL("models/w_assault.mdl"); break;
+	case ARMOURY_KEVLAR:		SAFE_PRECACHE_MODEL("models/w_kevlar.mdl"); break;
+	case ARMOURY_ASSAULT:		SAFE_PRECACHE_MODEL("models/w_assault.mdl"); break;
 	case ARMOURY_SMOKEGRENADE:	PRECACHE_MODEL("models/w_smokegrenade.mdl"); break;
-	default:			PRECACHE_MODEL("models/w_kevlar.mdl"); break;
+	default:			SAFE_PRECACHE_MODEL("models/w_kevlar.mdl"); break;
 	}
 }
 

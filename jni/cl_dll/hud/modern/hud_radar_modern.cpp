@@ -72,7 +72,7 @@ int CHudRadarModern::VidInit(void)
 	m_hRadar = gHUD.GetSprite(m_HUD_radar);
 	m_hRadaropaque = gHUD.GetSprite(m_HUD_radaropaque);
 
-m_player = gRenderAPI.GL_LoadTexture("gfx/billflx/player.tga", NULL, 0, TF_NEAREST |TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP );
+	m_player = R_CanLoadTexture() ? gRenderAPI.GL_LoadTexture("gfx/billflx/player.tga", NULL, 0, TF_NEAREST |TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP ) : 0;
 
 
 	return 1;
@@ -276,7 +276,7 @@ yOut = tall * 0.5 - (xTemp * yRightStep) - (yTemp * yUpStep);
 		//glEnable(GL_SCISSOR_TEST);
 
 		if (g_iXash)
-		gRenderAPI.GL_Scissor(1, sx, TrueHeight - tall - sy, wide, tall);
+		SPR_EnableScissor( sx, TrueHeight - tall - sy, wide, tall );
 
 		gEngfuncs.pTriAPI->RenderMode(kRenderTransTexture);
 		gEngfuncs.pTriAPI->CullFace(TRI_NONE);
@@ -317,16 +317,15 @@ yOut = tall * 0.5 - (xTemp * yRightStep) - (yTemp * yUpStep);
 			yOut += yRightStep;
 		}
 		//glDisable(GL_SCISSOR_TEST);
-		if (g_iXash)
-			gRenderAPI.GL_Scissor(0, 0, 0, 0, 0);
+		SPR_DisableScissor();
 	}
 
 	DrawUtils::DrawOutlinedRect(sx / gHUD.m_flScale, sy / gHUD.m_flScale, wide / gHUD.m_flScale, tall / gHUD.m_flScale, 0, 0, 0, 255);
 
 	DrawUtils::DrawOutlinedRect2(sx / gHUD.m_flScale, sy / gHUD.m_flScale, wide / gHUD.m_flScale, tall / gHUD.m_flScale + 40, 0, 0, 0, 200);
 
-gRenderAPI.GL_SelectTexture( 0 );
-gRenderAPI.GL_Bind(0, m_player);
+if( R_CanBindTexture() && m_player > 0 ) gRenderAPI.GL_SelectTexture( 0 );
+if( R_CanBindTexture() && m_player > 0 ) gRenderAPI.GL_Bind(0, m_player);
 gEngfuncs.pTriAPI->RenderMode( kRenderTransAlpha );
 DrawUtils::Draw2DQuad(sx / 2, sy, wide, tall - TrueHeight / -70 ); 
 
@@ -1028,7 +1027,7 @@ xOut = 1.23 * ScreenWidth * 0.5 - (xTemp * xRightStep) - (yTemp * xUpStep);
 yOut = 1 * ScreenHeight * 0.5 - (xTemp * yRightStep) - (yTemp * yUpStep);
 
 DrawUtils::DrawRectangle(xstart + 300, ystart, xend - xstart - 600, yend - ystart, 0, 0, 0, 150, false);
-gRenderAPI.GL_Scissor(1, xstart + 300, ystart, xend - xstart - 600, yend - ystart);
+SPR_EnableScissor( xstart + 300, ystart, xend - xstart - 600, yend - ystart );
 
 //enable, wide, height,wide, tall
 
@@ -1072,7 +1071,7 @@ gRenderAPI.GL_Scissor(1, xstart + 300, ystart, xend - xstart - 600, yend - ystar
 		}
 		//glDisable(GL_SCISSOR_TEST);
 		if (g_iXash)
-			gRenderAPI.GL_Scissor(0, 0, 0, 0, 0);
+			SPR_DisableScissor();
 	}
 
 

@@ -377,6 +377,9 @@ public:
 
 	virtual void RestartRound();
 
+	// CSPB: used by special kill effects (lead milestones).
+	int GetMaxOpponentFrags(int myTeam);
+
 	// check if the scenario has been won/lost
 	virtual void CheckWinConditions();
 	virtual void RemoveGuns();

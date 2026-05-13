@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_zombie_s.h"
 
 #define KNIFE_BODYHIT_VOLUME		128
@@ -51,7 +52,7 @@ void Czombie_s::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_XM1014;
-	SET_MODEL(ENT(pev), "models/w_xm1014.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_xm1014.mdl"));
 
 	m_iDefaultAmmo = ZOMBIES_MAXCLIP;
 

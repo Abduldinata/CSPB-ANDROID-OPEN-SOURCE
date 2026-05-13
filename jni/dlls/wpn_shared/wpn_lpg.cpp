@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cbase.h"
 #include "player.h"
+#include "model_helper.h"
 #include "weapons.h"
 #include "wpn_lpg.h"
 
@@ -35,11 +36,21 @@ ANIM5
 
 LINK_ENTITY_TO_CLASS(weapon_gasbomb, CLPG)
 
+// Android-safe quarantine for the post-melee precache chain:
+// - preferred view model: models/billflx/v_gasbomb_melon.mdl
+// - active fallback: models/billflx/v_k400.mdl
+// v_k400 already passes earlier HE grenade precache on the same run.
+static const char* kGasBombViewModel = "models/billflx/v_k400.mdl";
+static const char* kGasBombPlayerModel = "models/p_gasbomb_melon.mdl";
+static const char* kGasBombPlayerFallback = "models/p_hegrenade.mdl";
+static const char* kGasBombWorldModel = "models/w_gasbomb_melon.mdl";
+static const char* kGasBombWorldFallback = "models/w_hegrenade.mdl";
+
 void CLPG::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_HEGRENADE;
-	SET_MODEL(ENT(pev), "models/w_hegrenade.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_MODEL_OR_FALLBACK(kGasBombWorldModel, kGasBombWorldFallback));
 
 	pev->dmg = 4;
 	m_iDefaultAmmo = HEGRENADE_DEFAULT_GIVE;
@@ -53,8 +64,9 @@ void CLPG::Spawn(void)
 void CLPG::Precache(void)
 {
 	//ct
-PRECACHE_MODEL("models/billflx/v_gasbomb_melon.mdl");
-PRECACHE_MODEL("models/w_gasbomb_melon.mdl");
+PRECACHE_MODEL(kGasBombViewModel);
+PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kGasBombWorldModel, kGasBombWorldFallback));
+PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kGasBombPlayerModel, kGasBombPlayerFallback));
 
 
 #ifdef ENABLE_SHIELD
@@ -93,7 +105,7 @@ BOOL CLPG::Deploy(void)
 m_flReleaseThrow = -1;
 	m_fMaxSpeed = 250;
 	
-if ( DefaultDeploy("models/billflx/v_gasbomb_melon.mdl", "models/p_gasbomb_melon.mdl", HEGRENADE_DRAW, "grenade", 0));
+if ( DefaultDeploy(kGasBombViewModel, RESOLVE_MODEL_OR_FALLBACK(kGasBombPlayerModel, kGasBombPlayerFallback), HEGRENADE_DRAW, "grenade", 0));
 
 {
 	m_flNextPrimaryAttack = m_pPlayer->m_flNextAttack = UTIL_WeaponTimeBase() + 0.3;

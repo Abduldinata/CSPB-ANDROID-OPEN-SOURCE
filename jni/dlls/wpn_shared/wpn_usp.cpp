@@ -19,6 +19,7 @@
 #include "player.h"
 #include "weapons.h"
 #include "wpn_usp.h"
+#include "../model_helper.h"
 
 enum usp_e
 {
@@ -60,7 +61,7 @@ void CUSP::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_USP;
-	SET_MODEL(ENT(pev), "models/w_usp.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_usp.mdl"));
 
 	m_iDefaultAmmo = USP_DEFAULT_GIVE;
 	m_flAccuracy = 0.92;
@@ -78,7 +79,7 @@ PRECACHE_MODEL("models/billflx/v_k5.mdl");
 
 
 	PRECACHE_MODEL("models/p_k5.mdl");
-	PRECACHE_MODEL("models/shield/v_shield_usp.mdl");
+	SAFE_PRECACHE_MODEL("models/shield/v_shield_usp.mdl");
 
 	PRECACHE_SOUND("weapons/k5-1.wav");
 	PRECACHE_SOUND("weapons/usp2.wav");

@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_compound_bow.h"
 #ifndef CLIENT_DLL
 #include "effects.h"
@@ -223,6 +224,7 @@ enum bow_e
 };
 
 LINK_ENTITY_TO_CLASS(weapon_bow, CBow)
+LINK_ENTITY_TO_CLASS(weapon_compound_bow, CBow)
 
 void CBow::Spawn(void)
 {
@@ -230,7 +232,7 @@ void CBow::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_USP;
-	SET_MODEL(ENT(pev), "models/w_bow.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_bow.mdl"));
 	m_flAccuracy = 0.2;
 	m_iShotsFired = 0;
 m_crosshair = false;

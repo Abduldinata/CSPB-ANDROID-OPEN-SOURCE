@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_hegrenade.h"
 
 enum hegrenade_e
@@ -34,7 +35,7 @@ void CHEGrenade::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_HEGRENADE;
-	SET_MODEL(ENT(pev), "models/w_hegrenade.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_MODEL_OR_FALLBACK("models/w_hegrenade.mdl", "models/w_hegrenade.mdl"));
 
 	pev->dmg = 4;
 	m_iDefaultAmmo = HEGRENADE_DEFAULT_GIVE;
@@ -88,7 +89,7 @@ m_flReleaseThrow = -1;
 	
 
 
-if ( DefaultDeploy("models/billflx/v_k400.mdl", "models/p_k400.mdl", HEGRENADE_DRAW, "grenade", 0));
+if ( DefaultDeploy("models/billflx/v_k400.mdl", RESOLVE_MODEL_OR_FALLBACK("models/p_k400.mdl", "models/p_hegrenade.mdl"), HEGRENADE_DRAW, "grenade", 0));
 
 {
 	m_flNextPrimaryAttack = m_pPlayer->m_flNextAttack = UTIL_WeaponTimeBase() + 0.3;

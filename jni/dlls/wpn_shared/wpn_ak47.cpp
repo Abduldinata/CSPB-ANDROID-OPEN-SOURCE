@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_ak47.h"
 
 //extern cvar_t ak47_damage;
@@ -60,7 +61,7 @@ void CAK47::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GALIL;
-	SET_MODEL(ENT(pev), "models/w_ak47.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_ak47.mdl"));
 
 	m_iDefaultAmmo = AK47_DEFAULT_GIVE;
 	m_flAccuracy = 0.2;

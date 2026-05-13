@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_knife.h"
 
 #ifndef CLIENT_DLL
@@ -65,7 +66,7 @@ void CKnife::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 	m_iClip = WEAPON_NOCLIP;
 m_iDefaultAmmo = KNIFE_AMMO;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -77,7 +78,7 @@ void CKnife::Precache(void)
 {
 PRECACHE_MODEL("models/billflx/v_m7.mdl");
 
-	PRECACHE_MODEL("models/w_knife.mdl");
+	PRECACHE_MODEL(RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 
 	PRECACHE_SOUND("weapons/knife_draw.wav");
 	PRECACHE_SOUND("weapons/knife_hit1.wav");

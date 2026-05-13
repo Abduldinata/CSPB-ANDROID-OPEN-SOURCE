@@ -71,7 +71,7 @@ inline T clamp2(T const &val, T const &minVal, T const &maxVal) //renamed to cla
 
 typedef int BOOL;
 typedef int qboolean;
-//typedef unsigned int ULONG;
+typedef unsigned int ULONG;
 //typedef unsigned char BYTE;
 typedef unsigned char byte;
 typedef unsigned short word;

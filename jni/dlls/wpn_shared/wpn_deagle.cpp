@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_deagle.h"
 
 enum deagle_e
@@ -44,7 +45,7 @@ void CDEAGLE::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_USP;
-	SET_MODEL(ENT(pev), "models/w_desert_eagle.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_desert_eagle.mdl"));
 
 	m_iDefaultAmmo = DEAGLE_DEFAULT_GIVE;
 	m_flAccuracy = 0.9;

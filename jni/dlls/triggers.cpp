@@ -615,7 +615,7 @@ void PlayCDTrack(int iTrack)
 
 	if (iTrack < -1 || iTrack > 30)
 	{
-		ALERT(at_console, "TriggerCDAudio - Track %d out of range\n");
+		ALERT(at_console, "TriggerCDAudio - Track %d out of range\n", iTrack);
 		return;
 	}
 
@@ -626,7 +626,7 @@ void PlayCDTrack(int iTrack)
 	else
 	{
 		char string[64];
-		Q_sprintf(string, "cd play %3d\n", iTrack);
+		Q_snprintf(string, sizeof(string), "cd play %3d\n", iTrack);
 		CLIENT_COMMAND(pClient, string);
 	}
 

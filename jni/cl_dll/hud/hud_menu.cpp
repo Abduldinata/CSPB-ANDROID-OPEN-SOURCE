@@ -132,14 +132,16 @@ int CHudMenu :: Draw( float flTime )
 }
 
 // selects an item from the menu
-void CHudMenu :: SelectMenuItem( int menu_item )
+void CHudMenu::SelectMenuItem(int menu_item)
 {
-	// if menu_item is in a valid slot,  send a menuselect command to the server
-	if ( (menu_item > 0) && (m_bitsValidSlots & (1 << (menu_item-1))) )
+	// if menu_item is in a valid slot, send a menuselect command to the server
+	if ((menu_item > 0) && (m_bitsValidSlots & (1 << (menu_item - 1))))
 	{
 		char szbuf[32];
-		sprintf( szbuf, "menuselect %d\n", menu_item );
-		ClientCmd( szbuf );
+		snprintf(szbuf, sizeof(szbuf), "menuselect %d\n", menu_item);
+		szbuf[sizeof(szbuf) - 1] = '\0';
+
+		ClientCmd(szbuf);
 
 		// remove the menu
 		m_fMenuDisplayed = 0;
@@ -155,24 +157,25 @@ void CHudMenu :: SelectMenuItem( int menu_item )
 //		byte : a boolean, TRUE if there is more string yet to be received before displaying the menu, FALSE if it's the last string
 //		string: menu string to display
 // if this message is never received, then scores will simply be the combined totals of the players.
-int CHudMenu :: MsgFunc_ShowMenu( const char *pszName, int iSize, void *pbuf )
+int CHudMenu::MsgFunc_ShowMenu(const char *pszName, int iSize, void *pbuf)
 {
-	char *temp = NULL, *menustring;
+	char *temp = NULL;
+	char *menustring = NULL;
 
-	BufferReader reader( pszName, pbuf, iSize );
+	BufferReader reader(pszName, pbuf, iSize);
 
 	m_bitsValidSlots = reader.ReadShort();
 	int DisplayTime = reader.ReadChar();
 	int NeedMore = reader.ReadByte();
 
-	if ( DisplayTime > 0 )
+	if (DisplayTime > 0)
 		m_flShutoffTime = DisplayTime + gHUD.m_flTime;
 	else
 		m_flShutoffTime = -1;
 
-	if ( !m_bitsValidSlots )
+	if (!m_bitsValidSlots)
 	{
-		m_fMenuDisplayed = 0; // no valid slots means that the menu should be turned off
+		m_fMenuDisplayed = 0;
 		m_iFlags &= ~HUD_DRAW;
 		ClientCmd("touch_removebutton _menu_*");
 		return 1;
@@ -180,49 +183,86 @@ int CHudMenu :: MsgFunc_ShowMenu( const char *pszName, int iSize, void *pbuf )
 
 	menustring = reader.ReadString();
 
+	if (!menustring)
+		menustring = (char *)"";
+
 	// menu will be replaced by scripted touch config
 	// so execute it and exit
-	if( _extended_menus->value != 0.0f )
+	if (_extended_menus && _extended_menus->value != 0.0f)
 	{
-		if( !strncmp(menustring, "#Radio", 6 ) )
+		if (!strncmp(menustring, "#Radio", 6))
 		{
-			if( menustring[6] == 'A' )
+			if (menustring[6] == 'A')
 			{
-				ShowVGUIMenu(MENU_RADIOA); return 1;
+				ShowVGUIMenu(MENU_RADIOA);
+				return 1;
 			}
-			else if( menustring[6] == 'B' )
+			else if (menustring[6] == 'B')
 			{
-				ShowVGUIMenu(MENU_RADIOB); return 1;
+				ShowVGUIMenu(MENU_RADIOB);
+				return 1;
 			}
-			else if( menustring[6] == 'C' )
+			else if (menustring[6] == 'C')
 			{
-				ShowVGUIMenu(MENU_RADIOC); return 1;
+				ShowVGUIMenu(MENU_RADIOC);
+				return 1;
 			}
-			else ShowVGUIMenu( MENU_NUMERICAL_MENU ); // we just show touch screen numbers
+			else
+			{
+				ShowVGUIMenu(MENU_NUMERICAL_MENU);
+			}
 		}
-		else ShowVGUIMenu(MENU_NUMERICAL_MENU);
-	}
-	else ShowVGUIMenu(MENU_NUMERICAL_MENU);
-
-	if ( !m_fWaitingForMore ) // this is the start of a new menu
-	{
-		strncpy( g_szPrelocalisedMenuString, menustring, MAX_MENU_STRING );
+		else
+		{
+			ShowVGUIMenu(MENU_NUMERICAL_MENU);
+		}
 	}
 	else
-	{  // append to the current menu string
-		strncat( g_szPrelocalisedMenuString, menustring, MAX_MENU_STRING - strlen(g_szPrelocalisedMenuString) );
+	{
+		ShowVGUIMenu(MENU_NUMERICAL_MENU);
 	}
-	g_szPrelocalisedMenuString[MAX_MENU_STRING-1] = 0;  // ensure null termination (strncat/strncpy does not)
 
-	if ( !NeedMore )
-	{  // we have the whole string, so we can localise it now
-		strncpy( g_szMenuString, gHUD.m_TextMessage.BufferedLocaliseTextString( g_szPrelocalisedMenuString ), MAX_MENU_STRING );
-
-		// Swap in characters
-		if ( KB_ConvertString( g_szMenuString, &temp ) )
+	if (!m_fWaitingForMore)
+	{
+		strncpy(g_szPrelocalisedMenuString, menustring, MAX_MENU_STRING - 1);
+		g_szPrelocalisedMenuString[MAX_MENU_STRING - 1] = '\0';
+	}
+	else
+	{
+		if (menustring[0])
 		{
-			strncpy( g_szMenuString, temp, MAX_MENU_STRING );
-			free( temp );
+			g_szPrelocalisedMenuString[MAX_MENU_STRING - 1] = '\0';
+
+			size_t len = strlen(g_szPrelocalisedMenuString);
+			if (len < MAX_MENU_STRING - 1)
+			{
+				size_t remaining = MAX_MENU_STRING - len - 1;
+				strncat(g_szPrelocalisedMenuString, menustring, remaining);
+				g_szPrelocalisedMenuString[MAX_MENU_STRING - 1] = '\0';
+			}
+		}
+	}
+
+	g_szPrelocalisedMenuString[MAX_MENU_STRING - 1] = '\0';
+
+	if (!NeedMore)
+	{
+		const char *localized = gHUD.m_TextMessage.BufferedLocaliseTextString(g_szPrelocalisedMenuString);
+
+		if (!localized)
+			localized = g_szPrelocalisedMenuString;
+
+		strncpy(g_szMenuString, localized, MAX_MENU_STRING - 1);
+		g_szMenuString[MAX_MENU_STRING - 1] = '\0';
+
+		if (KB_ConvertString(g_szMenuString, &temp))
+		{
+			if (temp)
+			{
+				strncpy(g_szMenuString, temp, MAX_MENU_STRING - 1);
+				g_szMenuString[MAX_MENU_STRING - 1] = '\0';
+				free(temp);
+			}
 		}
 	}
 

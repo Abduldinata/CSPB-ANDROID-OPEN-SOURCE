@@ -3,6 +3,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_kriss_sv_dual_silence.h"
 
 //kriss silencer dual
@@ -35,7 +36,7 @@ void CKriss_sv_dual_silence::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_SG550;
-	SET_MODEL(ENT(pev), "models/w_scar.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_scar.mdl");
 
 	m_iDefaultAmmo = KSILENCER_AMMO;
 	m_flAccuracy = 0.2;

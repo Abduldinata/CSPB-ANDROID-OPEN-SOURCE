@@ -78,6 +78,8 @@ float CTalkMonster::g_talkWaitTime = 0;
 char gszallsentencenames[ CVOXFILESENTENCEMAX ][ CBSENTENCENAME_MAX ];
 sentenceg rgsentenceg[ CSENTENCEG_MAX ];
 
+#define SENTENCE_RUNTIME_NAME_MAX (CBSENTENCENAME_MAX + 16)
+
 #define CTEXTURESMAX		512			// max number of textures loaded
 
 char grgszTextureName[ CTEXTURESMAX ][ CBTEXTURENAMEMAX ];
@@ -1061,12 +1063,11 @@ void USENTENCEG_InitLRU(unsigned char *plru, int count)
 // ipick is passed in as the requested sentence ordinal.
 // ipick 'next' is returned.
 // return of -1 indicates an error.
-
 int USENTENCEG_PickSequential(int isentenceg, char *szfound, int ipick, int freset)
 {
 	char *szgroupname;
 	unsigned char count;
-	char sznum[8];
+	char sznum[16];
 
 	if (!fSentencesInit)
 		return -1;
@@ -1085,7 +1086,7 @@ int USENTENCEG_PickSequential(int isentenceg, char *szfound, int ipick, int fres
 
 	Q_strcpy(szfound, "!");
 	Q_strcat(szfound, szgroupname);
-	Q_sprintf(sznum, "%d", ipick);
+	Q_snprintf(sznum, sizeof(sznum), "%d", ipick);
 	Q_strcat(szfound, sznum);
 
 	if (ipick >= count)
@@ -1113,7 +1114,7 @@ int USENTENCEG_Pick(int isentenceg, char *szfound)
 	unsigned char *plru;
 	unsigned char i;
 	unsigned char count;
-	char sznum[8];
+	char sznum[16];
 	unsigned char ipick = 0xFF;
 	BOOL ffound = FALSE;
 
@@ -1144,7 +1145,7 @@ int USENTENCEG_Pick(int isentenceg, char *szfound)
 		{
 			Q_strcpy(szfound, "!");
 			Q_strcat(szfound, szgroupname);
-			Q_sprintf(sznum, "%d", ipick);
+			Q_snprintf(sznum, sizeof(sznum), "%d", ipick);
 			Q_strcat(szfound, sznum);
 
 			return ipick;
@@ -1187,7 +1188,7 @@ int SENTENCEG_GetIndex(const char *szgroupname)
 
 int SENTENCEG_PlayRndI(edict_t *entity, int isentenceg, float volume, float attenuation, int flags, int pitch)
 {
-	char name[64];
+	char name[SENTENCE_RUNTIME_NAME_MAX];
 	int ipick;
 
 	if (!fSentencesInit)
@@ -1206,7 +1207,7 @@ int SENTENCEG_PlayRndI(edict_t *entity, int isentenceg, float volume, float atte
 
 int SENTENCEG_PlayRndSz(edict_t *entity, const char *szgroupname, float volume, float attenuation, int flags, int pitch)
 {
-	char name[64];
+	char name[SENTENCE_RUNTIME_NAME_MAX];
 	int ipick;
 	int isentenceg;
 
@@ -1236,7 +1237,7 @@ int SENTENCEG_PlayRndSz(edict_t *entity, const char *szgroupname, float volume, 
 
 int SENTENCEG_PlaySequentialSz(edict_t *entity, const char *szgroupname, float volume, float attenuation, int flags, int pitch, int ipick, int freset)
 {
-	char name[64];
+	char name[SENTENCE_RUNTIME_NAME_MAX];
 	int ipicknext;
 	int isentenceg;
 
@@ -1263,8 +1264,8 @@ int SENTENCEG_PlaySequentialSz(edict_t *entity, const char *szgroupname, float v
 
 NOXREF void SENTENCEG_Stop(edict_t *entity, int isentenceg, int ipick)
 {
-	char buffer[64];
-	char sznum[8];
+	char buffer[SENTENCE_RUNTIME_NAME_MAX];
+	char sznum[16];
 
 	if (!fSentencesInit)
 		return;
@@ -1274,7 +1275,7 @@ NOXREF void SENTENCEG_Stop(edict_t *entity, int isentenceg, int ipick)
 
 	Q_strcpy(buffer, "!");
 	Q_strcat(buffer, rgsentenceg[isentenceg].szgroupname);
-	Q_sprintf(sznum, "%d", ipick);
+	Q_snprintf(sznum, sizeof(sznum), "%d", ipick);
 	Q_strcat(buffer, sznum);
 
 	STOP_SOUND(entity, CHAN_VOICE, buffer);
@@ -1287,7 +1288,7 @@ NOXREF void SENTENCEG_Stop(edict_t *entity, int isentenceg, int ipick)
 void SENTENCEG_Init()
 {
 	char buffer[512];
-	char szgroup[64];
+	char szgroup[CBSENTENCENAME_MAX];
 	int i, j;
 	int isentencegs;
 
@@ -1411,7 +1412,7 @@ void SENTENCEG_Init()
 
 int SENTENCEG_Lookup(const char *sample, char *sentencenum)
 {
-	char sznum[8];
+	char sznum[16];
 	int i;
 
 	// this is a sentence name; lookup sentence number
@@ -1423,7 +1424,7 @@ int SENTENCEG_Lookup(const char *sample, char *sentencenum)
 			if (sentencenum)
 			{
 				Q_strcpy(sentencenum, "!");
-				Q_sprintf(sznum, "%d", i);
+				Q_snprintf(sznum, sizeof(sznum), "%d", i);
 				Q_strcat(sentencenum, sznum);
 			}
 			return i;

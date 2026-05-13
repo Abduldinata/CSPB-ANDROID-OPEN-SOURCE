@@ -985,6 +985,7 @@ int CGameStudioModelRenderer::_StudioDrawPlayer(int flags, entity_state_t *pplay
 		{
 			studiohdr_t *saveheader = m_pStudioHeader;
 			cl_entity_t saveent = *m_pCurrentEntity;
+			int numAttachments;
 
 			model_t *pweaponmodel = IEngineStudio.GetModelByIndex(pplayer->weaponmodel);
 
@@ -1002,8 +1003,16 @@ int CGameStudioModelRenderer::_StudioDrawPlayer(int flags, entity_state_t *pplay
 
 			StudioCalcAttachments();
 
+			numAttachments = m_pStudioHeader->numattachments;
+			if (numAttachments > MAXSTUDIOATTACHMENTS)
+			{
+				gEngfuncs.Con_DPrintf("Clamping weapon attachments on %s from %d to %d\n",
+					pweaponmodel->name, m_pStudioHeader->numattachments, MAXSTUDIOATTACHMENTS);
+				numAttachments = MAXSTUDIOATTACHMENTS;
+			}
+
 			if (m_pCurrentEntity->index > 0)
-				memcpy(saveent.attachment, m_pCurrentEntity->attachment, sizeof(vec3_t) * m_pStudioHeader->numattachments);
+				memcpy(saveent.attachment, m_pCurrentEntity->attachment, sizeof(vec3_t) * numAttachments);
 
 			*m_pCurrentEntity = saveent;
 			m_pStudioHeader = saveheader;

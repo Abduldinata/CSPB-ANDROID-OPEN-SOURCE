@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "game.h"
 #include "wpn_scout.h"
 
@@ -46,7 +47,7 @@ void CSCOUT::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_SCOUT;
-	SET_MODEL(ENT(pev), "models/w_scout.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_scout.mdl"));
 
 	m_iDefaultAmmo = SCOUT_DEFAULT_GIVE;
 	FallInit();

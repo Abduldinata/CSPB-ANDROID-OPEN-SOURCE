@@ -59,7 +59,14 @@ typedef int BOOL;
 #include <stdarg.h>
 #include <string.h> // memset 
 
-#define _vsnprintf(a,b,c,d) vsnprintf(a,b,c,d)
+#ifndef _vsnprintf
+// 64-bit safe: prevent huge size (underflow) which triggers Android FORTIFY.
+// Clamps size to a reasonable max (65535) and ensures it is never negative.
+#define _vsnprintf(a,b,c,d) vsnprintf(a, (size_t)(((int64_t)(b) <= 0) ? 0 : (((int64_t)(b) > 65535) ? 65535 : (b))), c, d)
+#endif
+#ifndef _snprintf
+#define _snprintf(a,b,c,...) snprintf(a, (size_t)(((int64_t)(b) <= 0) ? 0 : (((int64_t)(b) > 65535) ? 65535 : (b))), c, ##__VA_ARGS__)
+#endif
 #endif //_WIN32
 
 // Misc C-runtime library headers

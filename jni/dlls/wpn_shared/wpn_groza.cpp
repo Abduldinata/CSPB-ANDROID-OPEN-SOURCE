@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "game.h"
 #include "wpn_groza.h"
 
@@ -46,7 +47,7 @@ void CGROZA::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GALIL;
-	SET_MODEL(ENT(pev), "models/w_groza.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_groza.mdl"));
 
 	m_iDefaultAmmo = AUG_DEFAULT_GIVE;
 	m_flAccuracy = 0.2;

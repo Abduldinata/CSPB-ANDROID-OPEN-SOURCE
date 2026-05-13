@@ -21,6 +21,7 @@
 #include "player.h"
 #include "weapons.h"
 #include "game.h"
+#include "model_helper.h"
 #include "wpn_kriss_sv_crb.h"
 
 #ifndef CLIENT_DLL
@@ -58,7 +59,7 @@ void CKriss_sv_crb::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GALIL;
-	SET_MODEL(ENT(pev), "models/w_scar.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_scar.mdl");
 
 	m_iDefaultAmmo = SCARL_AMMO;
 
@@ -127,7 +128,7 @@ PRECACHE_MODEL("models/billflx/v_kriss_sv_crb.mdl");
 
 	PRECACHE_MODEL("models/p_kriss_sv_crb.mdl");
 
-	PRECACHE_MODEL("models/w_scar.mdl");
+	SAFE_PRECACHE_MODEL("models/w_scar.mdl");
 
 //test
 m_iSprBeam = PRECACHE_MODEL("sprites/trace.spr");

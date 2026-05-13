@@ -106,15 +106,18 @@ CHudRadarLegacy::~CHudRadarLegacy()
 	// GL_FreeTexture( hDot ); engine inner texture
 	if (bTexturesInitialized)
 	{
-		gRenderAPI.GL_FreeTexture(hT);
-		gRenderAPI.GL_FreeTexture(hFlippedT);
-		gRenderAPI.GL_FreeTexture(hCross);
+		if( R_CanFreeTexture() )
+		{
+			if( hT > 0 ) gRenderAPI.GL_FreeTexture(hT);
+			if( hFlippedT > 0 ) gRenderAPI.GL_FreeTexture(hFlippedT);
+			if( hCross > 0 ) gRenderAPI.GL_FreeTexture(hCross);
+		}
 	}
 }
 
 int CHudRadarLegacy::VidInit(void)
 {
-	bUseRenderAPI = g_iXash && InitBuiltinTextures();
+	bUseRenderAPI = R_CanLoadTexture() && gRenderAPI.GL_CreateTexture != nullptr && InitBuiltinTextures();
 
 	m_hRadar.SetSpriteByName("radar");
 	m_hRadarOpaque.SetSpriteByName("radaropaque");
@@ -139,13 +142,12 @@ int CHudRadarLegacy::InitBuiltinTextures(void)
 		int		*texnum;
 		int		w, h;
 		void(*init)(int w, int h, byte *buf);
-		int	texType;
 	}
 	textures[] =
 	{
-	{ "radarT",		   (byte*)r_RadarT,      &hT,		 8, 8, Radar_InitBitmap, TEX_CUSTOM },
-	{ "radarcross",    (byte*)r_RadarCross,    &hCross,    8, 8, Radar_InitBitmap, TEX_CUSTOM },
-	{ "radarflippedT", (byte*)r_RadarFlippedT, &hFlippedT, 8, 8, Radar_InitBitmap, TEX_CUSTOM }
+	{ "radarT",		   (byte*)r_RadarT,      &hT,		 8, 8, Radar_InitBitmap },
+	{ "radarcross",    (byte*)r_RadarCross,    &hCross,    8, 8, Radar_InitBitmap },
+	{ "radarflippedT", (byte*)r_RadarFlippedT, &hFlippedT, 8, 8, Radar_InitBitmap }
 	};
 	size_t	i, num_builtin_textures = sizeof(textures) / sizeof(textures[0]);
 
@@ -155,14 +157,13 @@ int CHudRadarLegacy::InitBuiltinTextures(void)
 		*textures[i].texnum = gRenderAPI.GL_CreateTexture(textures[i].name, textures[i].w, textures[i].h, data2D, defFlags);
 		if (*textures[i].texnum == 0)
 		{
-			for (size_t j = 0; j < i; i++)
+			for (size_t j = 0; j < i; j++)
 			{
-				gRenderAPI.GL_FreeTexture(*textures[i].texnum);
+				if( *textures[j].texnum > 0 && R_CanFreeTexture() )
+					gRenderAPI.GL_FreeTexture(*textures[j].texnum);
 			}
 			return 0;
 		}
-
-		gRenderAPI.GL_SetTextureType(*textures[i].texnum, textures[i].texType);
 	}
 
 	hDot = gRenderAPI.GL_LoadTexture("*white", NULL, 0, 0);

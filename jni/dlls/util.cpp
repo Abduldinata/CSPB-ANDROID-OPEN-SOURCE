@@ -155,12 +155,12 @@ void DBG_AssertFunction(BOOL fExpr, const char *szExpr, const char *szFile, int 
 	if (fExpr)
 		return;
 
-	char szOut[512];
+	char szOut[1024];
 
 	if (szMessage != NULL)
-		sprintf(szOut, "ASSERT FAILED:\n %s \n(%s@%d)\n%s", szExpr, szFile, szLine, szMessage);
+		Q_snprintf(szOut, sizeof(szOut), "ASSERT FAILED:\n %s \n(%s@%d)\n%s", szExpr, szFile, szLine, szMessage);
 	else
-		sprintf(szOut, "ASSERT FAILED:\n %s \n(%s@%d)", szExpr, szFile, szLine);
+		Q_snprintf(szOut, sizeof(szOut), "ASSERT FAILED:\n %s \n(%s@%d)", szExpr, szFile, szLine);
 
 	ALERT(at_console, szOut);
 }
@@ -811,6 +811,8 @@ void ClientPrint(entvars_t *client, int msg_dest, const char *msg_name, const ch
 	MESSAGE_END();
 }
 
+// CSPB 'Cuek' Precache Optimization (Bill's Style) - Logic moved to util.h as inline function.
+
 NOXREF void UTIL_SayText(const char *pText, CBaseEntity *pEntity)
 {
 	if (pEntity->IsNetClient())
@@ -832,29 +834,29 @@ void UTIL_SayTextAll(const char *pText, CBaseEntity *pEntity)
 
 char *UTIL_dtos1(int d)
 {
-	static char buf[8];
-	Q_sprintf(buf, "%d", d);
+	static char buf[16];
+	Q_snprintf(buf, sizeof(buf), "%d", d);
 	return buf;
 }
 
 char *UTIL_dtos2(int d)
 {
-	static char buf[8];
-	Q_sprintf(buf, "%d", d);
+	static char buf[16];
+	Q_snprintf(buf, sizeof(buf), "%d", d);
 	return buf;
 }
 
 NOXREF char *UTIL_dtos3(int d)
 {
-	static char buf[8];
-	Q_sprintf(buf, "%d", d);
+	static char buf[16];
+	Q_snprintf(buf, sizeof(buf), "%d", d);
 	return buf;
 }
 
 NOXREF char *UTIL_dtos4(int d)
 {
-	static char buf[8];
-	Q_sprintf(buf, "%d", d);
+	static char buf[16];
+	Q_snprintf(buf, sizeof(buf), "%d", d);
 	return buf;
 }
 
@@ -1022,10 +1024,10 @@ float UTIL_SplineFraction(float value, float scale)
 char *UTIL_VarArgs(const char *format, ...)
 {
 	va_list argptr;
-	static char string[1024];
+	static char string[2048];
 
 	va_start(argptr, format);
-	vsprintf(string, format, argptr);
+	Q_vsnprintf(string, sizeof(string), format, argptr);
 	va_end(argptr);
 
 	return string;
@@ -1493,10 +1495,10 @@ void UTIL_PrecacheOther(const char *szClassname)
 void UTIL_LogPrintf(const char *fmt, ...)
 {
 	va_list argptr;
-	static char string[1024];
+	static char string[2048];
 
 	va_start(argptr, fmt);
-	vsprintf(string, fmt, argptr);
+	Q_vsnprintf(string, sizeof(string), fmt, argptr);
 	va_end(argptr);
 
 	ALERT(at_logged, "%s", string);
@@ -2371,4 +2373,313 @@ int UTIL_ReadFlags(const char *c)
 	}
 
 	return flags;
+}
+
+// Android Stability & Launcher Logic
+BOOL UTIL_FileExists( const char *filename )
+{
+	if ( !filename || !filename[0] ) return FALSE;
+	// Check if file exists via engine filesystem
+	if ( GET_FILE_SIZE( (char *)filename ) >= 0 ) return TRUE;
+
+	// Many CSPB sounds are referenced as "weapons/foo.wav", "player/bar.wav", etc
+	// while the real filesystem stores them under "sound/<category>/...".
+	// Try the canonical GoldSrc on-disk form before treating the asset as missing.
+	const char *ext = strrchr( filename, '.' );
+	const bool looksLikeSound = ext &&
+		( !Q_stricmp( ext, ".wav" ) || !Q_stricmp( ext, ".mp3" ) || !Q_stricmp( ext, ".ogg" ) );
+	if( looksLikeSound && strncmp( filename, "sound/", 6 ) != 0 )
+	{
+		char soundPath[512];
+		Q_snprintf( soundPath, sizeof( soundPath ), "sound/%s", filename );
+		if( GET_FILE_SIZE( soundPath ) >= 0 )
+			return TRUE;
+	}
+	return FALSE;
+}
+
+// Some "existing" models can still be invalid/corrupted (wrong format, truncated, etc).
+// On certain Android devices this may lead to a hard crash during precache with no clear log.
+// We add a tiny sanity check for GoldSrc .mdl header (must start with "IDST").
+static BOOL UTIL_ReadFileMagic4_OS( const char *relPath, unsigned char outMagic[4] )
+{
+	if( !relPath || !relPath[0] || !outMagic ) return FALSE;
+
+	// Try both absolute "<gamedir>/<relPath>" and plain relative "relPath".
+	// The engine FS can read inside VFS/PAKs, but we can't cheaply read only 4 bytes from it.
+	// OS fopen works for our Android external-storage layout.
+	char gameDir[256];
+	gameDir[0] = '\0';
+	if( g_engfuncs.pfnGetGameDir )
+		g_engfuncs.pfnGetGameDir( gameDir );
+
+	char absPath[512];
+	absPath[0] = '\0';
+	if( gameDir[0] )
+	{
+		// Normalize to forward slash; Android/Linux accepts it.
+		Q_snprintf( absPath, sizeof( absPath ), "%s/%s", gameDir, relPath );
+	}
+
+	const char *tryPaths[3];
+	int nTry = 0;
+	if( absPath[0] ) tryPaths[nTry++] = absPath;
+	tryPaths[nTry++] = relPath;
+	tryPaths[nTry] = nullptr;
+
+	for( int i = 0; i < nTry; i++ )
+	{
+		const char *p = tryPaths[i];
+		FILE *fp = fopen( p, "rb" );
+		if( !fp ) continue;
+		size_t n = fread( outMagic, 1, 4, fp );
+		fclose( fp );
+		if( n == 4 ) return TRUE;
+	}
+
+	return FALSE;
+}
+
+// Minimal on-disk studio header used only for sanity checks.
+// Matches HL1-style studiohdr_t layout (ints + float[3] vec3s).
+typedef struct cspb_studiohdr_s
+{
+	int   ident;
+	int   version;
+	char  name[64];
+	int   length;
+
+	float eyeposition[3];
+	float min[3];
+	float max[3];
+	float bbmin[3];
+	float bbmax[3];
+
+	int flags;
+
+	int numbones;
+	int boneindex;
+
+	int numbonecontrollers;
+	int bonecontrollerindex;
+
+	int numhitboxes;
+	int hitboxindex;
+
+	int numseq;
+	int seqindex;
+
+	int numseqgroups;
+	int seqgroupindex;
+
+	int numtextures;
+	int textureindex;
+	int texturedataindex;
+
+	int numskinref;
+	int numskinfamilies;
+	int skinindex;
+
+	int numbodyparts;
+	int bodypartindex;
+
+	int numattachments;
+	int attachmentindex;
+
+	int soundtable;
+	int soundindex;
+	int soundgroups;
+	int soundgroupindex;
+
+	int numtransitions;
+	int transitionindex;
+} cspb_studiohdr_t;
+
+static BOOL UTIL_ReadStudioHdr_OS( const char *relPath, cspb_studiohdr_t *outHdr )
+{
+	if( !relPath || !relPath[0] || !outHdr ) return FALSE;
+
+	char gameDir[256];
+	gameDir[0] = '\0';
+	if( g_engfuncs.pfnGetGameDir )
+		g_engfuncs.pfnGetGameDir( gameDir );
+
+	char absPath[512];
+	absPath[0] = '\0';
+	if( gameDir[0] )
+		Q_snprintf( absPath, sizeof( absPath ), "%s/%s", gameDir, relPath );
+
+	const char *tryPaths[3];
+	int nTry = 0;
+	if( absPath[0] ) tryPaths[nTry++] = absPath;
+	tryPaths[nTry++] = relPath;
+	tryPaths[nTry] = nullptr;
+
+	for( int i = 0; i < nTry; i++ )
+	{
+		const char *p = tryPaths[i];
+		FILE *fp = fopen( p, "rb" );
+		if( !fp ) continue;
+		size_t n = fread( outHdr, 1, sizeof( *outHdr ), fp );
+		fclose( fp );
+		if( n == sizeof( *outHdr ) ) return TRUE;
+	}
+
+	return FALSE;
+}
+
+static BOOL UTIL_IsSaneStudioHdr( const cspb_studiohdr_t &h, int fileSize, const char *relPath )
+{
+	// ident must be "IDST" (little-endian int)
+	const int IDST = (int)('I' | ('D'<<8) | ('S'<<16) | ('T'<<24));
+	if( h.ident != IDST )
+	{
+		CSPB_LOG_DIAG("[PRECACHE] MDL sanity fail (%s): ident=0x%08x", relPath, h.ident);
+		return FALSE;
+	}
+
+	// HL1/GldSrc studio version is typically 10. Some tools write 11, but keep it strict to avoid crashes.
+	if( h.version != 10 )
+	{
+		CSPB_LOG_DIAG("[PRECACHE] MDL sanity fail (%s): version=%d", relPath, h.version);
+		return FALSE;
+	}
+
+	if( h.length <= 0 || h.length > fileSize )
+	{
+		CSPB_LOG_DIAG("[PRECACHE] MDL sanity fail (%s): length=%d fileSize=%d", relPath, h.length, fileSize);
+		return FALSE;
+	}
+
+	// Defensive upper bounds. If a model exceeds these, it's suspicious for mobile and may crash engine loaders.
+	if( h.numbones < 0 || h.numbones > 2048 ) return FALSE;
+	if( h.numbonecontrollers < 0 || h.numbonecontrollers > 256 ) return FALSE;
+	if( h.numhitboxes < 0 || h.numhitboxes > 4096 ) return FALSE;
+	if( h.numseq < 0 || h.numseq > 4096 ) return FALSE;
+	if( h.numseqgroups < 0 || h.numseqgroups > 256 ) return FALSE;
+	if( h.numtextures < 0 || h.numtextures > 4096 ) return FALSE;
+	if( h.numskinref < 0 || h.numskinref > 4096 ) return FALSE;
+	if( h.numskinfamilies < 0 || h.numskinfamilies > 4096 ) return FALSE;
+	if( h.numbodyparts < 0 || h.numbodyparts > 512 ) return FALSE;
+	if( h.numattachments < 0 || h.numattachments > 512 ) return FALSE;
+	if( h.soundgroups < 0 || h.soundgroups > 4096 ) return FALSE;
+	if( h.numtransitions < 0 || h.numtransitions > 8192 ) return FALSE;
+
+	// Basic offset sanity: if count > 0 then index should point somewhere inside declared length.
+	// (We don't validate element sizes here; this is a coarse pre-check to avoid obvious corruption.)
+	auto inRange = [&]( int idx ) -> BOOL {
+		return ( idx >= 0 && idx < h.length );
+	};
+
+	if( h.numbones > 0 && !inRange( h.boneindex ) ) return FALSE;
+	if( h.numbonecontrollers > 0 && !inRange( h.bonecontrollerindex ) ) return FALSE;
+	if( h.numhitboxes > 0 && !inRange( h.hitboxindex ) ) return FALSE;
+	if( h.numseq > 0 && !inRange( h.seqindex ) ) return FALSE;
+	if( h.numseqgroups > 0 && !inRange( h.seqgroupindex ) ) return FALSE;
+	if( h.numtextures > 0 && !inRange( h.textureindex ) ) return FALSE;
+	if( h.numtextures > 0 && !inRange( h.texturedataindex ) ) return FALSE;
+	if( h.numskinref > 0 && !inRange( h.skinindex ) ) return FALSE;
+	if( h.numbodyparts > 0 && !inRange( h.bodypartindex ) ) return FALSE;
+	if( h.numattachments > 0 && !inRange( h.attachmentindex ) ) return FALSE;
+	if( h.soundtable > 0 && !inRange( h.soundindex ) ) return FALSE;
+	if( h.soundgroups > 0 && !inRange( h.soundgroupindex ) ) return FALSE;
+	if( h.numtransitions > 0 && !inRange( h.transitionindex ) ) return FALSE;
+
+	return TRUE;
+}
+
+static BOOL UTIL_IsValidGoldSrcMdl( const char *relPath, int fileSize )
+{
+	// If we can't open the file on OS (e.g. it's inside VFS/PAK), don't block.
+	// This check is mainly for external storage where corruption is common.
+	unsigned char magic[4];
+	if( !UTIL_ReadFileMagic4_OS( relPath, magic ) )
+	{
+		return TRUE;
+	}
+
+	if( !( magic[0] == 'I' && magic[1] == 'D' && magic[2] == 'S' && magic[3] == 'T' ) )
+		return FALSE;
+
+	cspb_studiohdr_t hdr;
+	if( !UTIL_ReadStudioHdr_OS( relPath, &hdr ) )
+	{
+		// If we can't read the full header, treat as suspicious (likely truncated).
+		return FALSE;
+	}
+
+	return UTIL_IsSaneStudioHdr( hdr, fileSize, relPath );
+}
+
+static BOOL CSPB_ShouldBypassHeavyModel( const char *path, int fileSize )
+{
+#ifdef ANDROID
+	if( !path || !path[0] || fileSize <= 0 )
+		return FALSE;
+
+	// Large first-person weapon models are the most common precache crash source on Android.
+	// Skip only optional presentation models, not players/world/shared utility models.
+	const int kHeavyWeaponModelBytes = 15000000;
+	if( fileSize < kHeavyWeaponModelBytes )
+		return FALSE;
+
+	if( !Q_strnicmp( path, "models/sight/", 13 ) )
+		return TRUE;
+#else
+	(void)path;
+	(void)fileSize;
+#endif
+	return FALSE;
+}
+
+int UTIL_PrecacheModel( const char *s )
+{
+	int sz = GET_FILE_SIZE( (char *)s );
+	CSPB_LOG_DIAG("[PRECACHE] Trying model: %s (size=%d)", s, sz);
+	if ( UTIL_FileExists( s ) )
+	{
+		const char *ext = Q_strrchr( s, '.' );
+		if( ext && !Q_stricmp( ext, ".mdl" ) )
+		{
+			if( !UTIL_IsValidGoldSrcMdl( s, sz ) )
+			{
+				CSPB_LOG_DIAG("[PRECACHE] INVALID/UNSAFE MDL: %s - bypassed", s);
+				ALERT( at_console, "CRITICAL: Invalid/unsafe MDL %s (sanity check failed). Bypassing to prevent FC.\n", s );
+				return 0;
+			}
+		}
+		if( CSPB_ShouldBypassHeavyModel( s, sz ) )
+		{
+			CSPB_LOG_DIAG("[PRECACHE] HEAVY MODEL BYPASSED: %s (size=%d)", s, sz);
+			ALERT( at_console, "CRITICAL: Heavy model %s (%d bytes) bypassed on Android to prevent FC.\n", s, sz );
+			return 0;
+		}
+		CSPB_LOG_DIAG("[PRECACHE] FOUND, loading: %s", s);
+		int result = (*g_engfuncs.pfnPrecacheModel)( (char *)s );
+		CSPB_LOG_DIAG("[PRECACHE] DONE: %s (id=%d)", s, result);
+		return result;
+	}
+	CSPB_LOG_DIAG("[PRECACHE] MISSING: %s - bypassed", s);
+	ALERT( at_console, "CRITICAL: Model file %s not found! Bypassing to prevent FC.\n", s );
+	return 0;
+}
+
+int UTIL_PrecacheSound( const char *s )
+{
+	if ( UTIL_FileExists( s ) )
+	{
+		return (*g_engfuncs.pfnPrecacheSound)( (char *)s );
+	}
+	CSPB_LOG_DIAG("[PRECACHE] MISSING SOUND: %s - bypassed", s);
+	return 0;
+}
+
+int UTIL_PrecacheGeneric( const char *s )
+{
+	if ( UTIL_FileExists( s ) )
+	{
+		return (*g_engfuncs.pfnPrecacheGeneric)( (char *)s );
+	}
+	CSPB_LOG_DIAG("[PRECACHE] MISSING GENERIC: %s - bypassed", s);
+	return 0;
 }

@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_deagle_dual.h"
 
 enum infinity_e
@@ -53,7 +54,7 @@ void CDeagle_dual::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_P228;
-	SET_MODEL(ENT(pev), GetCSModelName());
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL(GetCSModelName()));
 
 	m_iMaxClip = 14;
 	m_iDefaultAmmo = m_iMaxClip;

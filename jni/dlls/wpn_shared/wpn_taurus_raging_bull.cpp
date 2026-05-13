@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_taurus_raging_bull.h"
 
 enum p228_e
@@ -61,7 +62,7 @@ void CTaurus_raging_bull::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_DEAGLE;
-	SET_MODEL(ENT(pev), "models/w_p228.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_p228.mdl"));
 
 	m_iDefaultAmmo = P228_DEFAULT_GIVE;
 	m_flAccuracy = 0.9;

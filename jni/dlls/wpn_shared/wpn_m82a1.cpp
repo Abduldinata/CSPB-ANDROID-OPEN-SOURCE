@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "game.h"
 #include "wpn_m82a1.h"
 
@@ -47,7 +48,7 @@ void CM82A1::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_G3SG1;
-	SET_MODEL(ENT(pev), "models/w_dragunov.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_dragunov.mdl"));
 	m_iDefaultAmmo = M82A1_MAXCLIP;
 
 	FallInit();

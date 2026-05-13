@@ -59,6 +59,10 @@ NOXREF BOOL CSound::FIsScent()
 void CSoundEnt::Spawn()
 {
 	pev->solid = SOLID_NOT;
+
+	// FIX: Set global pointer BEFORE calling Initialize
+	pSoundEnt = this;
+
 	Initialize();
 
 	pev->nextthink = gpGlobals->time + 1;
@@ -118,16 +122,12 @@ void CSoundEnt::Precache()
 void CSoundEnt::FreeSound(int iSound, int iPrevious)
 {
 	if (!pSoundEnt)
-	{
-		// no sound ent!
 		return;
-	}
 
 	if (iPrevious != SOUNDLIST_EMPTY)
 	{
 		// iSound is not the head of the active list, so
 		// must fix the index for the Previous sound
-		// pSoundEnt->m_SoundPool[ iPrevious ].m_iNext = m_SoundPool[ iSound ].m_iNext;
 		pSoundEnt->m_SoundPool[ iPrevious ].m_iNext = pSoundEnt->m_SoundPool[ iSound ].m_iNext;
 	}
 	else
@@ -140,6 +140,7 @@ void CSoundEnt::FreeSound(int iSound, int iPrevious)
 	pSoundEnt->m_SoundPool[ iSound ].m_iNext = pSoundEnt->m_iFreeSound;
 	pSoundEnt->m_iFreeSound = iSound;
 }
+
 
 // IAllocSound - moves a sound from the Free list to the
 // Active list returns the index of the alloc'd sound
@@ -181,16 +182,13 @@ void CSoundEnt::InsertSound(int iType, const Vector &vecOrigin, int iVolume, flo
 	int iThisSound;
 
 	if (!pSoundEnt)
-	{
-		// no sound ent!
 		return;
-	}
 
 	iThisSound = pSoundEnt->IAllocSound();
 
 	if (iThisSound == SOUNDLIST_EMPTY)
 	{
-		ALERT(at_console, "Could not AllocSound() for InsertSound() (DLL)\n");
+		// ALERT(at_console, "Could not AllocSound() for InsertSound() (DLL)\n");
 		return;
 	}
 
@@ -225,15 +223,16 @@ void CSoundEnt::Initialize()
 	// now reserve enough sounds for each client
 	for (i = 0; i < gpGlobals->maxClients; ++i)
 	{
-		iSound = pSoundEnt->IAllocSound();
+		// FIX: Use local IAllocSound instead of pSoundEnt global which might be NULL during first spawn
+		iSound = IAllocSound();
 
 		if (iSound == SOUNDLIST_EMPTY)
 		{
-			ALERT(at_console, "Could not AllocSound() for Client Reserve! (DLL)\n");
+			// ALERT(at_console, "Could not AllocSound() for Client Reserve! (DLL)\n");
 			return;
 		}
 
-		pSoundEnt->m_SoundPool[ iSound ].m_flExpireTime = SOUND_NEVER_EXPIRE;
+		m_SoundPool[ iSound ].m_flExpireTime = SOUND_NEVER_EXPIRE;
 	}
 
 	if (CVAR_GET_FLOAT("displaysoundlist") == 1)

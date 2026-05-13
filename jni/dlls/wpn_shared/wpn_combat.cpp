@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_combat.h"
 
 #ifndef CLIENT_DLL
@@ -26,6 +27,10 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Android-safe quarantine for optional late melee paths.
+static const char* kCombatViewModel = "models/billflx/v_dual_knife.mdl";
+static const char* kCombatPlayerModel = "models/p_dual_knife.mdl";
 
 LINK_ENTITY_TO_CLASS(weapon_combat,CCombat)
 
@@ -60,7 +65,7 @@ void CCombat::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -71,12 +76,12 @@ void CCombat::Spawn(void)
 void CCombat::Precache(void)
 {
 	
-PRECACHE_MODEL("models/billflx/v_combat_machete.mdl");
+PRECACHE_MODEL(kCombatViewModel);
 
 #ifdef ENABLE_SHIELD
 	PRECACHE_MODEL("models/shield/v_shield_knife.mdl");
 #endif
-	PRECACHE_MODEL("models/p_combat_machete.mdl");
+	PRECACHE_MODEL(kCombatPlayerModel);
 
 	PRECACHE_SOUND("weapons/combat_machete_draw.wav");
 	PRECACHE_SOUND("weapons/knife_hit1.wav");
@@ -116,7 +121,7 @@ BOOL CCombat::Deploy(void)
 	m_iSwing = 0;
 	
 		
-return DefaultDeploy("models/billflx/v_combat_machete.mdl", "models/p_combat_machete.mdl", KNIFE_DRAW, "knife", 0);
+return DefaultDeploy(kCombatViewModel, kCombatPlayerModel, KNIFE_DRAW, "knife", 0);
 
 
 }

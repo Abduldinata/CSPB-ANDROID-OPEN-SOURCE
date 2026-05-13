@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cbase.h"
 #include "player.h"
+#include "model_helper.h"
 #include "weapons.h"
 #include "wpn_brass_knuckle.h"
 
@@ -26,6 +27,14 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Future asset note:
+// - preferred player model: models/p_brass_knuckle.mdl
+// - temporary fallback: models/p_knife.mdl
+// Keep the preferred path for future asset restoration; the fallback is only to keep CSPB tolerant if this
+// third-person model is missing or unstable on some builds.
+static const char* kBrassKnucklePlayerModel = "models/p_brass_knuckle.mdl";
+static const char* kBrassKnucklePlayerFallback = "models/p_knife.mdl";
 
 LINK_ENTITY_TO_CLASS(weapon_brass_knuckle, CBrass_knuckle)
 
@@ -57,7 +66,7 @@ void CBrass_knuckle::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -69,9 +78,7 @@ void CBrass_knuckle::Precache(void)
 {
 PRECACHE_MODEL("models/billflx/v_brass_knuckle.mdl");
 
-
-
-	PRECACHE_MODEL("models/p_brass_knuckle.mdl");
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kBrassKnucklePlayerModel, kBrassKnucklePlayerFallback));
 
 	PRECACHE_SOUND("weapons/brass_knuckle_draw.wav");
 	PRECACHE_SOUND("weapons/knife_hit1.wav");
@@ -116,7 +123,7 @@ BOOL CBrass_knuckle::Deploy(void)
 	m_iSwing = 0;
 	
 		
-return DefaultDeploy("models/billflx/v_brass_knuckle.mdl", "models/p_brass_knuckle.mdl", KNIFE_DRAW, "knuckle", UseDecrement() != FALSE);
+return DefaultDeploy("models/billflx/v_brass_knuckle.mdl", RESOLVE_MODEL_OR_FALLBACK(kBrassKnucklePlayerModel, kBrassKnucklePlayerFallback), KNIFE_DRAW, "knuckle", UseDecrement() != FALSE);
 }
 
 void CBrass_knuckle::QuickDeploy()

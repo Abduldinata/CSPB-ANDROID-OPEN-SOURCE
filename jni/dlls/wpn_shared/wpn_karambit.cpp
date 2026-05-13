@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cbase.h"
 #include "player.h"
+#include "model_helper.h"
 #include "weapons.h"
 #include "wpn_karambit.h"
 
@@ -26,6 +27,12 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Android-safe quarantine for the late melee precache chain:
+// - preferred view/player: v_karambit / p_karambit
+// - active safe pair: v_dual_knife / p_dual_knife
+static const char* kKarambitViewModel = "models/billflx/v_dual_knife.mdl";
+static const char* kKarambitPlayerModel = "models/p_dual_knife.mdl";
 
 LINK_ENTITY_TO_CLASS(weapon_karambit,CKarambit)
 
@@ -61,7 +68,7 @@ void CKarambit::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -72,8 +79,8 @@ void CKarambit::Spawn(void)
 void CKarambit::Precache(void)
 {
 	
-PRECACHE_MODEL("models/billflx/v_karambit.mdl");
-PRECACHE_MODEL("models/p_karambit.mdl");
+PRECACHE_MODEL(kKarambitViewModel);
+PRECACHE_MODEL(kKarambitPlayerModel);
 
 
 	PRECACHE_SOUND("combat_machete_hit_stab_2.wav");
@@ -115,7 +122,7 @@ BOOL CKarambit::Deploy(void)
 	m_iSwing = 0;
 
 		
-return DefaultDeploy("models/billflx/v_karambit.mdl", "models/p_karambit.mdl", KNIFE_DRAW, "knife", 0);
+return DefaultDeploy(kKarambitViewModel, kKarambitPlayerModel, KNIFE_DRAW, "knife", 0);
 
 }
 

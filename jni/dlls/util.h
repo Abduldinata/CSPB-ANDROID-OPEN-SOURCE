@@ -28,6 +28,15 @@
 
 #ifndef UTIL_H
 #define UTIL_H
+
+// Android/native precache diagnostics shown in adb logcat.
+#ifdef ANDROID
+#include <android/log.h>
+#define CSPB_LOG_DIAG(...) __android_log_print(ANDROID_LOG_DEBUG, "CSPB_DEBUG", __VA_ARGS__)
+#else
+#define CSPB_LOG_DIAG(...) ALERT(at_console, __VA_ARGS__)
+#endif
+
 #ifdef _WIN32
 #pragma once
 #endif
@@ -42,6 +51,8 @@
 #ifndef ENGINECALLBACK_H
 #include "enginecallback.h"
 #endif
+
+#include "model_helper.h"
 
 #ifdef CLIENT_DLL
 #include <UtlVector.h>
@@ -62,7 +73,7 @@
 
 #define cchMapNameMost		32
 
-#define CBSENTENCENAME_MAX	16
+#define CBSENTENCENAME_MAX	64	// Radio sentence names in CSPB exceed vanilla HL's 15-char limit.
 #define CVOXFILESENTENCEMAX	1536	// max number of sentences in game. NOTE: this must match CVOXFILESENTENCEMAX in engine\sound.h
 
 #define GROUP_OP_AND		0
@@ -493,5 +504,21 @@ int UTIL_ReadFlags(const char *c);
 
 extern int g_groupmask;
 extern int g_groupop;
+
+// Android Stability & Launcher Logic
+#ifndef CLIENT_DLL
+BOOL UTIL_FileExists( const char *filename );
+int UTIL_PrecacheModel( const char *s );
+int UTIL_PrecacheSound( const char *s );
+int UTIL_PrecacheGeneric( const char *s );
+
+// Redefine standard precache macros to use our safe server-side versions.
+#undef PRECACHE_MODEL
+#define PRECACHE_MODEL UTIL_PrecacheModel
+#undef PRECACHE_SOUND
+#define PRECACHE_SOUND UTIL_PrecacheSound
+#undef PRECACHE_GENERIC
+#define PRECACHE_GENERIC UTIL_PrecacheGeneric
+#endif
 
 #endif // UTIL_H

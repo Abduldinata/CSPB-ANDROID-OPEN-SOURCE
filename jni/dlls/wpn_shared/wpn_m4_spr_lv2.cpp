@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_m4_spr_lv2.h"
 
 enum aug_e
@@ -36,6 +37,17 @@ ANIM5,
 ANIM6
 };
 
+// Future asset notes:
+// - preferred player model: models/p_m4_spr_lv2.mdl
+// - temporary CSPB fallback: models/p_m4a1_s.mdl
+// - preferred world model: models/w_aug_a3.mdl
+// - temporary CSPB fallback: models/w_ak47_fc_bomb.mdl
+// When proper SPR assets are added, keep the preferred paths and remove/adjust the fallbacks.
+static const char* kM4SprLv2PlayerModel = "models/p_m4_spr_lv2.mdl";
+static const char* kM4SprLv2PlayerFallback = "models/p_m4a1_s.mdl";
+static const char* kM4SprLv2WorldModel = "models/w_aug_a3.mdl";
+static const char* kM4SprLv2WorldFallback = "models/w_ak47_fc_bomb.mdl";
+
 LINK_ENTITY_TO_CLASS(weapon_m4_spr_lv2, CM4_spr_lv2)
 
 const int M4_SPR_V2_MAXCLIP = 20;
@@ -46,7 +58,7 @@ void CM4_spr_lv2::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GALIL;
-	SET_MODEL(ENT(pev), "models/w_aug_a3.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_MODEL_OR_FALLBACK(kM4SprLv2WorldModel, kM4SprLv2WorldFallback));
 
 	m_iDefaultAmmo = M4_SPR_V2_MAXCLIP;
 	m_flAccuracy = 0.2;
@@ -60,7 +72,8 @@ void CM4_spr_lv2::Precache(void)
 	
 PRECACHE_MODEL("models/billflx/v_m4_spr_lv2.mdl");
 
-	PRECACHE_MODEL("models/p_m4_spr_lv2.mdl");
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kM4SprLv2WorldModel, kM4SprLv2WorldFallback));
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kM4SprLv2PlayerModel, kM4SprLv2PlayerFallback));
 
 	PRECACHE_SOUND("weapons/m4_spr_lv2-1.wav");
 	PRECACHE_SOUND("weapons/aug_clipout.wav");
@@ -99,7 +112,7 @@ BOOL CM4_spr_lv2::Deploy(void)
 	m_iShotsFired = 0;
 	iShellOn = 1;
 
-return DefaultDeploy("models/billflx/v_m4_spr_lv2.mdl", "models/p_m4_spr_lv2.mdl", AUG_DRAW, "rifle", 0);
+	return DefaultDeploy("models/billflx/v_m4_spr_lv2.mdl", RESOLVE_MODEL_OR_FALLBACK(kM4SprLv2PlayerModel, kM4SprLv2PlayerFallback), AUG_DRAW, "rifle", 0);
 
 }
 

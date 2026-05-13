@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_k2.h"
 
 enum mac10_e
@@ -44,7 +45,7 @@ void CK2::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_MAC10;
-	SET_MODEL(ENT(pev), "models/w_mac10.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_mac10.mdl"));
 
 	m_iDefaultAmmo = MAC10_DEFAULT_GIVE;
 	m_flAccuracy = 0.15;

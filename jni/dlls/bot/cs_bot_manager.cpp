@@ -310,22 +310,31 @@ bool CCSBotManager::IsOnOffense(CBasePlayer *player) const
 
 void CCSBotManager::ServerActivate()
 {
+	CSPB_LOG_DIAG("[BOTSERVER] begin");
 	DestroyNavigationMap();
 	m_isMapDataLoaded = false;
 
 	m_zoneCount = 0;
 	m_gameScenario = SCENARIO_DEATHMATCH;
 
+	CSPB_LOG_DIAG("[BOTSERVER] before ValidateMapData");
 	ValidateMapData();
+	CSPB_LOG_DIAG("[BOTSERVER] ValidateMapData done scenario=%d zones=%d", m_gameScenario, m_zoneCount);
+	CSPB_LOG_DIAG("[BOTSERVER] before RestartRound");
 	RestartRound();
+	CSPB_LOG_DIAG("[BOTSERVER] RestartRound done");
 
 	m_isLearningMap = false;
 	m_isAnalysisRequested = false;
 
 	m_bServerActive = true;
+	CSPB_LOG_DIAG("[BOTSERVER] before AddServerCommands");
 	AddServerCommands();
+	CSPB_LOG_DIAG("[BOTSERVER] AddServerCommands done");
 
+	CSPB_LOG_DIAG("[BOTSERVER] before TheBotPhrases->OnMapChange()");
 	TheBotPhrases->OnMapChange();
+	CSPB_LOG_DIAG("[BOTSERVER] end");
 }
 
 void CCSBotManager::AddServerCommand(const char *cmd)
@@ -1094,16 +1103,22 @@ private:
 void CCSBotManager::ValidateMapData()
 {
 	if (m_isMapDataLoaded || !g_bEnableCSBot)
+	{
+		CSPB_LOG_DIAG("[BOTSERVER] ValidateMapData skip loaded=%d enableBot=%d", m_isMapDataLoaded ? 1 : 0, g_bEnableCSBot ? 1 : 0);
 		return;
+	}
 
 	m_isMapDataLoaded = true;
+	CSPB_LOG_DIAG("[BOTSERVER] ValidateMapData start");
 
 	if (LoadNavigationMap())
 	{
+		CSPB_LOG_DIAG("[BOTSERVER] LoadNavigationMap failed");
 		CONSOLE_ECHO("Failed to load navigation map.\n");
 		return;
 	}
 
+	CSPB_LOG_DIAG("[BOTSERVER] LoadNavigationMap ok");
 	CONSOLE_ECHO("Navigation map loaded.\n");
 
 	m_zoneCount = 0;
@@ -1120,6 +1135,14 @@ void CCSBotManager::ValidateMapData()
 
 		if (entity == NULL)
 			continue;
+
+		if ((i % 256) == 0)
+		{
+			const char *classname = entity->pev && entity->pev->classname ? STRING(entity->pev->classname) : "<null>";
+			if (!classname || !classname[0])
+				classname = "<empty>";
+			CSPB_LOG_DIAG("[BOTSERVER] ValidateMapData entity=%d classname=%s", i, classname);
+		}
 
 		bool found = false;
 		bool isLegacy = false;
@@ -1175,6 +1198,8 @@ void CCSBotManager::ValidateMapData()
 				CONSOLE_ECHO("Warning: Too many zones, some will be ignored.\n");
 		}
 	}
+
+	CSPB_LOG_DIAG("[BOTSERVER] ValidateMapData end scenario=%d zones=%d", m_gameScenario, m_zoneCount);
 
 	// If there are no zones and the scenario is hostage rescue,
 	// use the info_player_start entities as rescue zones.

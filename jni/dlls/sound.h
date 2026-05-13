@@ -57,7 +57,7 @@
 // group of related sentences
 struct sentenceg
 {
-	char szgroupname[16];
+	char szgroupname[CBSENTENCENAME_MAX];
 	int count;
 	unsigned char rgblru[ CSENTENCE_LRU_MAX ];
 };

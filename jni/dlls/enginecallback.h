@@ -47,7 +47,10 @@ inline int PRECACHE_MODEL(const char *s) { return 0; }
 inline int PRECACHE_SOUND(const char *s) { return 0; }
 #define SET_MODEL(x, y)
 #else
-#define PRECACHE_MODEL	(*g_engfuncs.pfnPrecacheModel)
+// ARM64 test: disable Cuek hook, keep normal engine precache macro.
+#ifndef PRECACHE_MODEL
+#define PRECACHE_MODEL (*g_engfuncs.pfnPrecacheModel)
+#endif
 #define PRECACHE_SOUND	(*g_engfuncs.pfnPrecacheSound)
 #define SET_MODEL		(*g_engfuncs.pfnSetModel)
 #endif

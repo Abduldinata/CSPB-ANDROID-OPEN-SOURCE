@@ -28,7 +28,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := server
+LOCAL_MODULE := cspb_server_android_arm64
 
 include $(XASH3D_CONFIG)
 
@@ -38,9 +38,12 @@ endif
 
 LOCAL_CFLAGS += -fsigned-char -DCLIENT_WEAPONS -D_LINUX
 LOCAL_CFLAGS += -Dstricmp=strcasecmp -D_strnicmp=strncasecmp -Dstrnicmp=strncasecmp -D_snprintf=snprintf -D_stricmp=strcasecmp -D_vsnprintf=vsnprintf -D_strdup=strdup -D_write=write -D_close=close 
+LOCAL_CFLAGS += -Wno-error -Wno-invalid-offsetof
 LOCAL_CONLYFLAGS += -std=c99
-LOCAL_CPPFLAGS += -std=c++11 -frtti -fexceptions
-	
+LOCAL_CPPFLAGS += -std=c++11 -frtti -fexceptions -Wno-error -Wno-inconsistent-missing-override -Wno-invalid-offsetof
+LOCAL_LDLIBS += -llog
+
+
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/. \
     $(LOCAL_PATH)/.. \
     $(LOCAL_PATH)/hostage \

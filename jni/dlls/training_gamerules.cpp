@@ -9,6 +9,7 @@
 #include "game.h"
 #include "triggers.h"
 #include "globals.h"
+#include "model_helper.h"
 
 #include "pm_shared.h"
 #include "utllinkedlist.h"
@@ -81,7 +82,7 @@ TYPEDESCRIPTION CBaseGrenCatch::m_SaveData[] =
 
 CHalfLifeTraining::CHalfLifeTraining()
 {
-	PRECACHE_MODEL("models/w_weaponbox.mdl");
+	SAFE_PRECACHE_MODEL("models/w_weaponbox.mdl");
 }
 
 BOOL CHalfLifeTraining::IsDeathmatch()

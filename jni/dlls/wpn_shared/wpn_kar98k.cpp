@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_kar98k.h"
 #include "game.h"
 
@@ -51,7 +52,7 @@ void CKar98k::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_AWP;
-	SET_MODEL(ENT(pev), "models/w_sg552.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_sg552.mdl"));
 
 	m_iDefaultAmmo = KAR98K_MAXCLIP;
 	m_flAccuracy = 0.2;

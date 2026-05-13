@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_dual_knife.h"
 
 #ifndef CLIENT_DLL
@@ -61,7 +62,7 @@ void CDual_knife::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_bone_knife.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_bone_knife.mdl");
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;

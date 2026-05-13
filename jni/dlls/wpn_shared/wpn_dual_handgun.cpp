@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_dual_handgun.h"
 
 enum elite_e
@@ -53,7 +54,7 @@ void CDual_handgun::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_ELITE;
-	SET_MODEL(ENT(pev), "models/w_elite.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_elite.mdl"));
 
 	m_iDefaultAmmo = ELITE_DEFAULT_GIVE;
 	m_flAccuracy = 0.88;

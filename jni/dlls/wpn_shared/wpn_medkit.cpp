@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_medkit.h"
 
 enum medkit_e
@@ -27,6 +28,16 @@ enum medkit_e
 	medkit_THROW,
 	medkit_DRAW
 };
+
+// Android-safe quarantine for the final startup precache chain:
+// - preferred view model: models/billflx/v_medkit.mdl
+// - active fallback: models/billflx/v_special.mdl
+// v_special already passes smoke/special grenade precache earlier on the same run.
+static const char* kMedkitViewModel = "models/billflx/v_special.mdl";
+static const char* kMedkitWorldModel = "models/w_medkit.mdl";
+static const char* kMedkitWorldFallback = "models/w_smokegrenade.mdl";
+static const char* kMedkitPlayerModel = "models/p_smokegrenade.mdl";
+static const char* kMedkitPlayerFallback = "models/p_smokegrenade.mdl";
 
 //medkit
 #ifndef CLIENT_DLL
@@ -185,7 +196,7 @@ void CMedkit::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_SMOKEGRENADE;
-	SET_MODEL(ENT(pev), "models/w_medkit.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_MODEL_OR_FALLBACK(kMedkitWorldModel, kMedkitWorldFallback));
 
 	pev->dmg = 4;
 	m_iDefaultAmmo = SMOKEGRENADE_DEFAULT_GIVE;
@@ -198,9 +209,9 @@ void CMedkit::Spawn(void)
 
 void CMedkit::Precache(void)
 {
-	PRECACHE_MODEL("models/billflx/v_medkit.mdl");
-PRECACHE_MODEL("models/w_medkit.mdl");
-	PRECACHE_MODEL("models/p_molotov.mdl");
+	PRECACHE_MODEL(kMedkitViewModel);
+PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kMedkitWorldModel, kMedkitWorldFallback));
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kMedkitPlayerModel, kMedkitPlayerFallback));
 	PRECACHE_SOUND("weapons/molotov-1.wav");
 	PRECACHE_SOUND("weapons/molotov-2.wav");
 	PRECACHE_SOUND("weapons/molotov_hit1.wav");
@@ -236,7 +247,7 @@ BOOL CMedkit::Deploy(void)
 	m_flReleaseThrow = -1;
 	m_fMaxSpeed = 250;
 
-if (DefaultDeploy("models/billflx/v_medkit.mdl", "models/p_medkit.mdl", MOLLY_DRAW, "grenade", 0))
+if (DefaultDeploy(kMedkitViewModel, RESOLVE_MODEL_OR_FALLBACK(kMedkitPlayerModel, kMedkitPlayerFallback), MOLLY_DRAW, "grenade", 0))
 
 {
 	m_flNextPrimaryAttack = m_pPlayer->m_flNextAttack = UTIL_WeaponTimeBase() + 0.8;

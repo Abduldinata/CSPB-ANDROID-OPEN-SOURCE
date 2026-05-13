@@ -3,19 +3,20 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 
 #include "ammo.h"
 
 void C9MMAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C9MMAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -35,13 +36,13 @@ LINK_ENTITY_TO_CLASS(ammo_9mm, C9MMAmmo);
 void CBuckShotAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_shotbox.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_shotbox.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void CBuckShotAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_shotbox.mdl");
+	SAFE_PRECACHE_MODEL("models/w_shotbox.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -61,13 +62,13 @@ LINK_ENTITY_TO_CLASS(ammo_buckshot, CBuckShotAmmo);
 void C556NatoAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C556NatoAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -87,13 +88,13 @@ LINK_ENTITY_TO_CLASS(ammo_556nato, C556NatoAmmo);
 void C556NatoBoxAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C556NatoBoxAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -113,13 +114,13 @@ LINK_ENTITY_TO_CLASS(ammo_556natobox, C556NatoBoxAmmo);
 void C762NatoAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C762NatoAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -139,13 +140,13 @@ LINK_ENTITY_TO_CLASS(ammo_762nato, C762NatoAmmo);
 void C45ACPAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C45ACPAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -165,13 +166,13 @@ LINK_ENTITY_TO_CLASS(ammo_45acp, C45ACPAmmo);
 void C50AEAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C50AEAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -191,13 +192,13 @@ LINK_ENTITY_TO_CLASS(ammo_50ae, C50AEAmmo);
 void C338MagnumAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C338MagnumAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -217,13 +218,13 @@ LINK_ENTITY_TO_CLASS(ammo_338magnum, C338MagnumAmmo);
 void C57MMAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C57MMAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -243,13 +244,13 @@ LINK_ENTITY_TO_CLASS(ammo_57mm, C57MMAmmo);
 void C357SIGAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C357SIGAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -269,13 +270,13 @@ LINK_ENTITY_TO_CLASS(ammo_357sig, C357SIGAmmo);
 void C46MMAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C46MMAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -292,17 +293,16 @@ BOOL C46MMAmmo::AddAmmo(CBaseEntity *pOther)
 
 LINK_ENTITY_TO_CLASS(ammo_46mm, C46MMAmmo);
 
-
 void C50BMGAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void C50BMGAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -322,13 +322,13 @@ LINK_ENTITY_TO_CLASS(ammo_50bmg, C50BMGAmmo);
 void CCannonAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void CCannonAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -348,13 +348,13 @@ LINK_ENTITY_TO_CLASS(ammo_cannon, CCannonAmmo);
 void CGungnirAmmo::Spawn()
 {
 	Precache();
-	SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_9mmclip.mdl");
 	CBasePlayerAmmo::Spawn();
 }
 
 void CGungnirAmmo::Precache()
 {
-	PRECACHE_MODEL("models/w_9mmclip.mdl");
+	SAFE_PRECACHE_MODEL("models/w_9mmclip.mdl");
 	PRECACHE_SOUND("items/9mmclip1.wav");
 }
 
@@ -370,4 +370,3 @@ BOOL CGungnirAmmo::AddAmmo(CBaseEntity *pOther)
 }
 
 LINK_ENTITY_TO_CLASS(ammo_gungnir, CGungnirAmmo);
-

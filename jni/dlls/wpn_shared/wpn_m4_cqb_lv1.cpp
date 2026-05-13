@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_m4_cqb_lv1.h"
 
 enum m4a1_e
@@ -44,7 +45,7 @@ void CM4_cqb_lv1::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GALIL;
-	SET_MODEL(ENT(pev), "models/w_aug_a3.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_aug_a3.mdl"));
 
 	m_iDefaultAmmo = M4A1_DEFAULT_GIVE;
 	m_flAccuracy = 0.2;

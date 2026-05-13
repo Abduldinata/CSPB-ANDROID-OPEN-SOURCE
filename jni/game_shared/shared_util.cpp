@@ -33,21 +33,36 @@ char *SharedVarArgs(const char *format, ...)
 	return string[ curstring ];
 }
 
-/* <2d4ba1> ../game_shared/shared_util.cpp:90 */
 char *BufPrintf(char *buf, int &len, const char *fmt, ...)
 {
-	va_list argptr;
-	if (len > 0)
-	{
-		va_start(argptr, fmt);
-		Q_vsnprintf(buf, len, fmt, argptr);
-		va_end(argptr);
+	if (!buf || len <= 1)
+		return NULL;
 
-		len -= Q_strlen(buf);
-		return buf + Q_strlen(buf);
+	va_list argptr;
+	va_start(argptr, fmt);
+
+	int written = Q_vsnprintf(buf, len, fmt, argptr);
+
+	va_end(argptr);
+
+	buf[len - 1] = '\0';
+
+	if (written < 0)
+	{
+		len = 0;
+		return NULL;
 	}
 
-	return NULL;
+	int used = Q_strlen(buf);
+
+	if (used >= len)
+	{
+		len = 0;
+		return buf + used;
+	}
+
+	len -= used;
+	return buf + used;
 }
 
 
@@ -134,8 +149,11 @@ skipwhite:
 				return data;
 			}
 
-			s_shared_token[len] = c;
-			len++;
+			if (len < COM_TOKEN_LEN - 1)
+			{
+				s_shared_token[len] = c;
+				len++;
+			}
 		}
 	}
 
@@ -151,9 +169,12 @@ skipwhite:
 	// parse a regular word
 	do
 	{
-		s_shared_token[len] = c;
+		if (len < COM_TOKEN_LEN - 1)
+		{
+			s_shared_token[len] = c;
+			len++;
+		}
 		data++;
-		len++;
 		c = *data;
 
 		if (c == '{' || c == '}'|| c == ')'|| c == '(' || c == '\'' || c == ',')

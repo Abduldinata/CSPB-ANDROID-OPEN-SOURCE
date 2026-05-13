@@ -67,6 +67,13 @@ int DLLEXPORT Initialize( cl_enginefunc_t *pEnginefuncs, int iVersion )
 	gEngfuncs = *pEnginefuncs;
 
 	g_iXash = (int)CVAR_GET_FLOAT("build");
+#ifdef __ANDROID__
+	if (g_iXash == 0) g_iXash = 3350; // Fallback for Xash3D FWGS on Android
+#endif
+
+	gEngfuncs.Con_Printf("------------------------------------------------------\n");
+	gEngfuncs.Con_Printf("  CSPB Android Blankout v1.0 Client\n");
+	gEngfuncs.Con_Printf("------------------------------------------------------\n");
 
 	Game_HookEvents();
 
@@ -316,8 +323,20 @@ Called when Xash3D sends render api to us
 
 int DLLEXPORT HUD_GetRenderInterface( int version, render_api_t *renderfuncs, render_interface_t *callback )
 {
+	(void)callback;
+
+	if( !renderfuncs )
+	{
+		memset( &gRenderAPI, 0, sizeof( gRenderAPI ));
+		gEngfuncs.Con_Printf( "CL: Render API pointer is null.\n" );
+		return false;
+	}
+
 	if( version != CL_RENDER_INTERFACE_VERSION )
 	{
+		memset( &gRenderAPI, 0, sizeof( gRenderAPI ));
+		gEngfuncs.Con_Printf( "CL: Render API version mismatch (got %d, want %d). Rejecting interface.\n",
+			version, CL_RENDER_INTERFACE_VERSION );
 		return false;
 	}
 
@@ -330,7 +349,8 @@ int DLLEXPORT HUD_GetRenderInterface( int version, render_api_t *renderfuncs, re
 #ifdef __ANDROID__
 	if( g_iXash < 3224 )
 	{
-		gRenderAPI.Host_Error("Xash3D Android version check failed!\nPlease update your Xash3D Android!\n");
+		if( gRenderAPI.Host_Error )
+			gRenderAPI.Host_Error("Xash3D Android version check failed!\nPlease update your Xash3D Android!\n");
 	}
 #endif
 

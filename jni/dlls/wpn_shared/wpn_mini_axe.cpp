@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cbase.h"
 #include "player.h"
+#include "model_helper.h"
 #include "weapons.h"
 #include "wpn_mini_axe.h"
 #ifndef CLIENT_DLL
@@ -34,6 +35,31 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Future asset note:
+// - preferred world model: models/w_mini_axe.mdl
+// - current CSPB asset on disk: models/w_miniaxe.mdl
+// Keep the first path as the intended asset name; swap/remove the fallback when assets are normalized.
+static const char* kMiniAxeWorldModel = "models/w_mini_axe.mdl";
+static const char* kMiniAxeWorldFallback = "models/w_miniaxe.mdl";
+
+// Future asset note:
+// - preferred player model: models/p_mini_axe.mdl
+// - safe Android fallback: models/p_dual_knife.mdl
+static const char* kMiniAxeActivePlayerModel = "models/p_mini_axe.mdl";
+static const char* kMiniAxePlayerFallback = "models/p_dual_knife.mdl";
+
+// Future projectile/drop note:
+// - current projectile world model asset: models/w_miniaxe.mdl
+// If a dedicated throw model is added later, replace the first path below.
+static const char* kMiniAxeProjectileModel = "models/w_miniaxe.mdl";
+static const char* kMiniAxeProjectileFallback = "models/w_miniaxe.mdl";
+
+// Android-safe view model quarantine:
+// - preferred view model: models/billflx/v_mini_axe.mdl
+// - active fallback: models/billflx/v_amok_kukri.mdl
+// The preferred file exists, but the latest Android log dies immediately after loading it during precache.
+static const char* kMiniAxeViewModel = "models/billflx/v_amok_kukri.mdl";
 
 #ifndef CLIENT_DLL
 	Vector Get_Velocity_AngleAxe(CBaseEntity *pEntity, Vector Output)
@@ -64,7 +90,7 @@
 		{
 			Precache();
 
-			SET_MODEL(this->edict(), "models/w_miniaxe.mdl");
+			SET_MODEL(this->edict(), RESOLVE_MODEL_OR_FALLBACK(kMiniAxeProjectileModel, kMiniAxeProjectileFallback));
 			SetThink(&CAxe_t::OnThink);
 			SetTouch(&CAxe_t::OnTouch);
 			pev->mins = { -0.1, -0.1, -0.1 };
@@ -162,7 +188,7 @@
 		void Precache() override
 		{
 			m_iModelLight1 = PRECACHE_MODEL("sprites/smoke.spr");
-			PRECACHE_MODEL("models/w_miniaxe.mdl");
+			PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kMiniAxeProjectileModel, kMiniAxeProjectileFallback));
 		}
 
 		void OnThink()
@@ -248,7 +274,7 @@ void Cmini_axe::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_MODEL_OR_FALLBACK(kMiniAxeWorldModel, kMiniAxeWorldFallback));
 
 m_iDefaultAmmo = miniaxe_ammo;
 
@@ -261,9 +287,10 @@ m_iDefaultAmmo = miniaxe_ammo;
 void Cmini_axe::Precache(void)
 {
 	
-PRECACHE_MODEL("models/billflx/v_mini_axe.mdl");
+	PRECACHE_MODEL(kMiniAxeViewModel);
 
-	PRECACHE_MODEL("models/w_mini_axe.mdl");
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kMiniAxeWorldModel, kMiniAxeWorldFallback));
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kMiniAxeActivePlayerModel, kMiniAxePlayerFallback));
 
 	PRECACHE_SOUND("weapons/mini_axe_draw.wav");
 	PRECACHE_SOUND("weapons/mini_axe_hit_slash_1.wav");
@@ -313,7 +340,7 @@ BOOL Cmini_axe::Deploy(void)
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
 	m_pPlayer->m_bShieldDrawn = false;
 
-if (DefaultDeploy("models/billflx/v_mini_axe.mdl", "models/p_mini_axe.mdl", KNIFE_DRAW, "knife", UseDecrement() != FALSE) )
+if (DefaultDeploy(kMiniAxeViewModel, RESOLVE_MODEL_OR_FALLBACK(kMiniAxeActivePlayerModel, kMiniAxePlayerFallback), KNIFE_DRAW, "knife", UseDecrement() != FALSE) )
 	
 {
 	m_flNextPrimaryAttack = m_pPlayer->m_flNextAttack = UTIL_WeaponTimeBase() + 0.4;

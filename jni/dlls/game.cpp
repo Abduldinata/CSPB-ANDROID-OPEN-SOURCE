@@ -484,10 +484,12 @@ extern void Hostage_RegisterCVars();
 
 void EXT_FUNC GameDLLInit()
 {
+	CSPB_LOG_DIAG("[CSPB] GameDLLInit started");
 	//g_bIsCzeroGame = UTIL_IsGame("czero");
 	g_bIsCzeroGame = true;
 	g_bEnableCSBot = g_bIsCzeroGame || ENG_CHECK_PARM (const_cast<char *>("-bots"), nullptr) != 0;
 
+	CSPB_LOG_DIAG("[CSPB] Getting CVAR pointers");
 	g_psv_gravity = CVAR_GET_POINTER("sv_gravity");
 	g_psv_aim = CVAR_GET_POINTER("sv_aim");
 	g_footsteps = CVAR_GET_POINTER("mp_footsteps");
@@ -495,6 +497,7 @@ void EXT_FUNC GameDLLInit()
 	g_psv_friction = CVAR_GET_POINTER("sv_friction");
 	g_psv_stopspeed = CVAR_GET_POINTER("sv_stopspeed");
 
+	CSPB_LOG_DIAG("[CSPB] Registering main CVARs");
 	CVAR_REGISTER(&displaysoundlist);
 	CVAR_REGISTER(&timelimit);
 	CVAR_REGISTER(&friendlyfire);
@@ -529,10 +532,10 @@ void EXT_FUNC GameDLLInit()
 	CVAR_REGISTER(&allow_spectators);
 	CVAR_REGISTER(&mp_chattime);
 	CVAR_REGISTER(&kick_percent);
-CVAR_REGISTER(&pbhithuman);
-CVAR_REGISTER(&cl_delaykill);
-CVAR_REGISTER(&annhs);
-CVAR_REGISTER(&tracer);
+	CVAR_REGISTER(&pbhithuman);
+	CVAR_REGISTER(&cl_delaykill);
+	CVAR_REGISTER(&annhs);
+	CVAR_REGISTER(&tracer);
 	CVAR_REGISTER(&fragsleft);
 	CVAR_REGISTER(&timeleft);
 	CVAR_REGISTER(&humans_join_team);
@@ -541,6 +544,18 @@ CVAR_REGISTER(&tracer);
 	CVAR_REGISTER(&maxkills);
 	CVAR_REGISTER(&sv_unlimited_reserve_ammo);
 
+	CSPB_LOG_DIAG("[CSPB] Setting gl_max_size (Risky)");
+	// CSPB Optimization: Force texture downscaling to save RAM on Android
+	// This helps prevent OOM when loading many HD weapon models.
+	// CVAR_SET_FLOAT("gl_max_size", 256.0f); // Commented out to test if this is the crash point
+
+	ALERT(at_console, "------------------------------------------------------\n");
+	ALERT(at_console, "  CSPB Android Blankout v1.0 initialized\n");
+	// ALERT(at_console, "  Optimized Precache 'Cuek' Enabled\n");
+	ALERT(at_console, "  Optimized Precache 'Cuek' Disabled for arm64 test\n");
+	ALERT(at_console, "------------------------------------------------------\n");
+
+	CSPB_LOG_DIAG("[CSPB] Registering weapon CVARs");
 ////////
 CVAR_REGISTER(&weapon_damage_game_ak47);  
 CVAR_REGISTER(&weapon_damage_game_aksopmod);

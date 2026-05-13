@@ -20,6 +20,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_kriss_sv_dual_crb.h"
 
 #ifndef CLIENT_DLL
@@ -53,7 +54,7 @@ void CKriss_sv_dual_crb::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_SG550;
-	SET_MODEL(ENT(pev), "models/w_scar.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_scar.mdl");
 
 	m_iDefaultAmmo = SCARH_AMMO;
 	m_flAccuracy = 0.2;
@@ -124,7 +125,7 @@ void CKriss_sv_dual_crb::Precache(void)
 PRECACHE_MODEL("models/billflx/v_kriss_sv_crb_2.mdl");
 
 	PRECACHE_MODEL("models/p_kriss_sv_crb_2.mdl");
-	PRECACHE_MODEL("models/w_scar.mdl");
+	SAFE_PRECACHE_MODEL("models/w_scar.mdl");
 
 	PRECACHE_SOUND("weapons/scar_h.wav");
 	PRECACHE_SOUND("weapons/scar_l.wav");

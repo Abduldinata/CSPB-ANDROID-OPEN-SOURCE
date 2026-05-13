@@ -13,11 +13,31 @@ using SharedTexture = std::shared_ptr<CTextureRef>;
 using UniqueTexture = std::unique_ptr<CTextureRef>;
 using WeakTexture = std::weak_ptr<CTextureRef>;
 
+inline bool R_CanLoadTexture() noexcept
+{
+	return g_iXash && gRenderAPI.GL_LoadTexture != nullptr;
+}
+
+inline bool R_CanFreeTexture() noexcept
+{
+	return g_iXash && gRenderAPI.GL_FreeTexture != nullptr;
+}
+
+inline bool R_CanBindTexture() noexcept
+{
+	return g_iXash && gRenderAPI.GL_SelectTexture != nullptr && gRenderAPI.GL_Bind != nullptr;
+}
+
+inline bool R_CanQueryTextureParm() noexcept
+{
+	return g_iXash && gRenderAPI.RenderGetParm != nullptr;
+}
+
 class CTextureRef
 {
 public:
 	explicit CTextureRef(const char *path, int flags = TF_NEAREST | TF_NOPICMIP | TF_NOMIPMAP | TF_CLAMP)
-		: m_iInternalId(g_iXash ? gRenderAPI.GL_LoadTexture(path, NULL, 0, flags) : 0) {}
+		: m_iInternalId(R_CanLoadTexture() ? gRenderAPI.GL_LoadTexture(path, NULL, 0, flags) : 0) {}
 	CTextureRef(const CTextureRef&) = delete;
 	CTextureRef(CTextureRef &&rhs) : m_iInternalId(0) { std::swap(m_iInternalId, rhs.m_iInternalId); }
 	CTextureRef &operator=(const CTextureRef&) const = delete;
@@ -26,14 +46,14 @@ public:
 public:
 	~CTextureRef() 
 	{ 
-		if(g_iXash) 
+		if( R_CanFreeTexture() && m_iInternalId > 0 )
 			gRenderAPI.GL_FreeTexture(m_iInternalId); 
 	}
 
 public:
 	void Bind(int tmu = 0) const noexcept
 	{
-		if (g_iXash)
+		if (R_CanBindTexture() && m_iInternalId > 0)
 		{
 			gRenderAPI.GL_SelectTexture(tmu);
 			gRenderAPI.GL_Bind(tmu, m_iInternalId);
@@ -42,7 +62,7 @@ public:
 
 	int GetParm(int parm = PARM_TEX_TYPE) const noexcept 
 	{ 
-		if(g_iXash)
+		if( R_CanQueryTextureParm() && m_iInternalId > 0 )
 			return gRenderAPI.RenderGetParm(parm, m_iInternalId); 
 		return 0;
 	}

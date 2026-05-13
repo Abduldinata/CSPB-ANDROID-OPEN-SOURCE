@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cbase.h"
 #include "player.h"
+#include "model_helper.h"
 #include "weapons.h"
 #include "wpn_ice_fork.h"
 
@@ -26,6 +27,12 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Android-safe quarantine for the late melee precache chain:
+// - preferred view/player: v_knight_sword / p_knight_sword
+// - active safe pair: v_dual_knife / p_dual_knife
+static const char* kIceForkViewModel = "models/billflx/v_dual_knife.mdl";
+static const char* kIceForkPlayerModel = "models/p_dual_knife.mdl";
 
 LINK_ENTITY_TO_CLASS(weapon_ice, CIce)
 
@@ -61,7 +68,7 @@ void CIce::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -72,12 +79,12 @@ void CIce::Spawn(void)
 void CIce::Precache(void)
 {
 	
-PRECACHE_MODEL("models/billflx/v_knight_sword.mdl");
+PRECACHE_MODEL(kIceForkViewModel);
 
 #ifdef ENABLE_SHIELD
 	PRECACHE_MODEL("models/shield/v_shield_knife.mdl");
 #endif
-	PRECACHE_MODEL("models/p_knight_sword.mdl");
+	PRECACHE_MODEL(kIceForkPlayerModel);
 
 	PRECACHE_SOUND("weapons/combat_machete_draw.wav");
 	PRECACHE_SOUND("weapons/knife_hit1.wav");
@@ -117,7 +124,7 @@ BOOL CIce::Deploy(void)
 	m_iSwing = 0;
 	
 		
-return DefaultDeploy("models/billflx/v_knight_sword.mdl", "models/p_knight_sword.mdl", KNIFE_DRAW, "grenade", 0);
+return DefaultDeploy(kIceForkViewModel, kIceForkPlayerModel, KNIFE_DRAW, "grenade", 0);
 
 
 }

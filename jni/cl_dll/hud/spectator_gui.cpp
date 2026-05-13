@@ -250,16 +250,33 @@ int CHudSpectatorGui::Draw( float flTime )
 	return 1;
 }
 
-void CHudSpectatorGui::CalcAllNeededData( )
+void CHudSpectatorGui::CalcAllNeededData()
 {
 	// mapname
-	if( !label.m_szMap[0] )
+	if (!label.m_szMap[0])
 	{
-		static char szMapNameStripped[55];
-		const char *szMapName = gEngfuncs.pfnGetLevelName(); //  "maps/%s.bsp"
-		strncpy( szMapNameStripped, szMapName + 5, sizeof( szMapNameStripped ) );
-		szMapNameStripped[strlen(szMapNameStripped) - 4] = '\0';
-		snprintf( label.m_szMap, sizeof( label.m_szMap ), "Map: %s", szMapNameStripped );
+		static char szMapNameStripped[64];
+		const char *szMapName = gEngfuncs.pfnGetLevelName(); // "maps/%s.bsp"
+
+		szMapNameStripped[0] = '\0';
+
+		if (szMapName && !strncmp(szMapName, "maps/", 5) && strlen(szMapName) > 5)
+		{
+			strncpy(szMapNameStripped, szMapName + 5, sizeof(szMapNameStripped) - 1);
+			szMapNameStripped[sizeof(szMapNameStripped) - 1] = '\0';
+
+			size_t len = strlen(szMapNameStripped);
+			if (len > 4 && !strcmp(szMapNameStripped + len - 4, ".bsp"))
+				szMapNameStripped[len - 4] = '\0';
+		}
+		else
+		{
+			strncpy(szMapNameStripped, szMapName ? szMapName : "unknown", sizeof(szMapNameStripped) - 1);
+			szMapNameStripped[sizeof(szMapNameStripped) - 1] = '\0';
+		}
+
+		snprintf(label.m_szMap, sizeof(label.m_szMap), "Map: %s", szMapNameStripped[0] ? szMapNameStripped : "unknown");
+		label.m_szMap[sizeof(label.m_szMap) - 1] = '\0';
 	}
 
 	// team
@@ -268,7 +285,7 @@ void CHudSpectatorGui::CalcAllNeededData( )
 	for( int i = 0; i < MAX_PLAYERS; i++ )
 	{
 		if( g_PlayerExtraInfo[i].dead )
-			continue; // show remaining
+			continue;
 
 		switch( g_PlayerExtraInfo[i].teamnumber )
 		{
@@ -295,13 +312,13 @@ void CHudSpectatorGui::CalcAllNeededData( )
 	}
 
 	// timer
-	// time must be positive
 	if( !m_bBombPlanted )
 	{
 		int iMinutes = max( 0, (int)( gHUD.m_Timer.m_iTime + gHUD.m_Timer.m_fStartTime - gHUD.m_flTime ) / 60);
 		int iSeconds = max( 0, (int)( gHUD.m_Timer.m_iTime + gHUD.m_Timer.m_fStartTime - gHUD.m_flTime ) - (iMinutes * 60));
 
-		sprintf( label.m_szTimer, "%i:%i", iMinutes, iSeconds );
+		snprintf(label.m_szTimer, sizeof(label.m_szTimer), "%i:%02i", iMinutes, iSeconds);
+		label.m_szTimer[sizeof(label.m_szTimer) - 1] = '\0';
 	}
 
 	// player name
@@ -312,8 +329,12 @@ void CHudSpectatorGui::CalcAllNeededData( )
 
 		snprintf( label.m_szNameAndHealth, sizeof( label.m_szNameAndHealth ),
 				  "%s (%i)",  sInfo.name, g_PlayerExtraInfo[g_iUser2].health );
+		label.m_szNameAndHealth[sizeof(label.m_szNameAndHealth) - 1] = '\0';
 	}
-	else label.m_szNameAndHealth[0] = '\0';
+	else
+	{
+		label.m_szNameAndHealth[0] = '\0';
+	}
 }
 
 void CHudSpectatorGui::InitHUDData()

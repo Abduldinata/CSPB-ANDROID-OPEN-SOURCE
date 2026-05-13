@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "game.h"
 #include "wpn_spectre.h"
 
@@ -45,7 +46,7 @@ void CSPECTRE::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GALIL;
-	SET_MODEL(ENT(pev), "models/w_aug_a3.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_aug_a3.mdl"));
 
 	m_iDefaultAmmo = M4A1_DEFAULT_GIVE;
 	m_flAccuracy = 0.2;
@@ -58,7 +59,7 @@ void CSPECTRE::Precache(void)
 {
 	
 PRECACHE_MODEL("models/billflx/v_spectre.mdl");
-PRECACHE_MODEL("models/p_spectre.mdl");
+PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK("models/p_spectre.mdl", "models/p_mp9.mdl"));
 
 //test
 
@@ -100,7 +101,7 @@ m_flAccuracy = 0.2;
 	m_iShotsFired = 0;
 	iShellOn = 1;
 
-return DefaultDeploy("models/billflx/v_spectre.mdl", "models/p_spectre.mdl", AUG_DRAW, "rifle", 0);
+return DefaultDeploy("models/billflx/v_spectre.mdl", RESOLVE_MODEL_OR_FALLBACK("models/p_spectre.mdl", "models/p_mp9.mdl"), AUG_DRAW, "rifle", 0);
 
 }
 

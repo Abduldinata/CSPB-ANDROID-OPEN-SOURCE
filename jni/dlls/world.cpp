@@ -463,17 +463,18 @@ void CWorld::Spawn()
 
 			PRECACHE_GENERIC(UTIL_VarArgs("maps/default.txt"));
 		}
-
 		FREE_FILE(pFile);
 	}
 }
 
 void CWorld::Precache()
 {
+	CSPB_LOG_DIAG("[CSPB] CWorld::Precache started");
 	g_pLastSpawn = NULL;
 	g_pLastCTSpawn = NULL;
 	g_pLastTerroristSpawn = NULL;
 
+	CSPB_LOG_DIAG("[CSPB] Setting world CVARs");
 	CVAR_SET_STRING("sv_gravity", "800");
 	//CVAR_SET_STRING("sv_maxspeed", "900");
 	CVAR_SET_STRING("sv_stepsize", "18");
@@ -484,20 +485,30 @@ void CWorld::Precache()
 	// Set up game rules
 	if (g_pGameRules)
 	{
+		CSPB_LOG_DIAG("[CSPB] Deleting old g_pGameRules (%p)", g_pGameRules);
 		delete g_pGameRules; // CS16ND/ReGameDll : NOT virtual destructor ??? Fuck it.
+		g_pGameRules = NULL;
 	}
+
+	CSPB_LOG_DIAG("[CSPB] Calling InstallGameRules()");
 	g_pGameRules = (CHalfLifeMultiplay *)InstallGameRules();
+	CSPB_LOG_DIAG("[CSPB] InstallGameRules() returned %p", g_pGameRules);
+
+	CSPB_LOG_DIAG("[CSPB] Loading spawn points");
 	CSDM_LoadSpawnPoints();
 	
 
 	// UNDONE why is there so much Spawn code in the Precache function? I'll just keep it here
 
-	// LATER - do we want a sound ent in deathmatch? (sjb)
-	//pSoundEnt = CBaseEntity::Create("soundent", g_vecZero, g_vecZero, edict());
+	// Create soundent through the named-entity path so the engine and DLL agree
+	// on classname/private-data setup before ServerActivate scans non-client edicts.
 	pSoundEnt = CreateClassPtr<CSoundEnt>();
-	pSoundEnt->Spawn();
-
-	if (!pSoundEnt)
+	
+	if (pSoundEnt)
+	{
+		pSoundEnt->Spawn();
+	}
+	else
 	{
 		ALERT(at_console, "**COULD NOT CREATE SOUNDENT**\n");
 	}

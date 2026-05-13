@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_glock18.h"
 
 #ifdef CLIENT_DLL
@@ -62,7 +63,7 @@ void CGLOCK18::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GLOCK18;
-	SET_MODEL(ENT(pev), "models/w_glock18.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_glock18.mdl"));
 
 	m_bBurstFire = 0;
 	m_iGlock18ShotsFired = 0;

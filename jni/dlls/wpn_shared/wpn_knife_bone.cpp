@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_knife_bone.h"
 
 #ifndef CLIENT_DLL
@@ -26,6 +27,13 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Future asset note:
+// - preferred world model: models/w_bone_knife.mdl
+// - temporary CSPB fallback: models/w_miniaxe.mdl
+// When the dedicated W model exists, keep the first path and change/remove the fallback.
+static const char* kBoneKnifeWorldModel = "models/w_bone_knife.mdl";
+static const char* kBoneKnifeWorldFallback = "models/w_miniaxe.mdl";
 
 LINK_ENTITY_TO_CLASS(weapon_knifebone, CKnifebone)
 
@@ -61,7 +69,7 @@ void CKnifebone::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_bone_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_MODEL_OR_FALLBACK(kBoneKnifeWorldModel, kBoneKnifeWorldFallback));
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -74,7 +82,7 @@ void CKnifebone::Precache(void)
 	
 PRECACHE_MODEL("models/billflx/v_bone_knife.mdl");
 
-	PRECACHE_MODEL("models/w_bone_knife.mdl");
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kBoneKnifeWorldModel, kBoneKnifeWorldFallback));
 
 	PRECACHE_SOUND("weapons/knife_deploy1.wav");
 	PRECACHE_SOUND("weapons/knife_hit1.wav");

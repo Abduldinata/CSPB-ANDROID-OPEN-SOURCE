@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "game.h"
 #include "wpn_mp7.h"
 
@@ -45,7 +46,7 @@ void CMP7::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_SG552;
-	SET_MODEL(ENT(pev), "models/w_sg550.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_sg550.mdl"));
 	m_iDefaultAmmo = SG550_DEFAULT_GIVE;
 
 	FallInit();

@@ -340,7 +340,7 @@ void CFuncTank::Use(CBaseEntity *pActivator, CBaseEntity *pCaller, USE_TYPE useT
 		}
 		else if (!m_pController && useType != USE_OFF)
 		{
-			((CBasePlayer*)pActivator)->m_pTank = this;
+			((CBasePlayer*)pActivator)->m_pActiveTank = this;
 			StartControl((CBasePlayer*)pActivator);
 		}
 		else

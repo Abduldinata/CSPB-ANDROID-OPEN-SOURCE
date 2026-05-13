@@ -19,6 +19,7 @@
 #include "player.h"
 #include "weapons.h"
 #include "game.h"
+#include "model_helper.h"
 #include "wpn_m1887.h"
 
 enum m3_e
@@ -46,7 +47,7 @@ void CM1887::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_M3;
-	SET_MODEL(ENT(pev), "models/w_870mcs.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_870mcs.mdl"));
 	m_iDefaultAmmo = M3_DEFAULT_GIVE;
 
 	FallInit();
@@ -488,7 +489,7 @@ void CM1887_W::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_M3;
-	SET_MODEL(ENT(pev), "models/w_870mcs.mdl");
+SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_870mcs.mdl"));
 	m_iDefaultAmmo = M3_DEFAULT_GIVE;
 
 	FallInit();
@@ -500,7 +501,7 @@ void CM1887_W::Precache(void)
 
 PRECACHE_MODEL("models/billflx/v_m1887_w.mdl");
 
-	PRECACHE_MODEL("models/p_m1887_w.mdl");
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK("models/p_m1887_w.mdl", "models/p_m1887.mdl"));
 
 	m_iShellId = m_iShell = PRECACHE_MODEL("models/shotgunshell.mdl");
 
@@ -538,7 +539,7 @@ BOOL CM1887_W::Deploy(void)
 
 m_fInSpecialReload = 0;
 
-if (DefaultDeploy("models/billflx/v_m1887_w.mdl", "models/p_m1887_w.mdl", M3_DRAW, "shotgun", 0)) 
+if (DefaultDeploy("models/billflx/v_m1887_w.mdl", RESOLVE_MODEL_OR_FALLBACK("models/p_m1887_w.mdl", "models/p_m1887.mdl"), M3_DRAW, "shotgun", 0)) 
 
 {
 	m_flNextPrimaryAttack = m_pPlayer->m_flNextAttack = UTIL_WeaponTimeBase() + 0.6;

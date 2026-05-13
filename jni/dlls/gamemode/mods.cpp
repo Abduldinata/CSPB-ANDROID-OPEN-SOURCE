@@ -56,14 +56,27 @@ std::pair<const char *, IBaseMod *(*)()> g_FindList[] = {
 
 void InstallBteMod(const char *name)
 {
+	CSPB_LOG_DIAG("[MODS] InstallBteMod: request mod '%s'", name ? name : "<NULL>");
+
+	if (!name)
+	{
+		CSPB_LOG_DIAG("[MODS] InstallBteMod: name is NULL, using default");
+		g_pModRunning = g_FindList[0].second();
+		return;
+	}
+
 	for (auto p : g_FindList)
 	{
-		if (!strcasecmp(name, p.first))
+		if (p.first && !strcasecmp(name, p.first))
 		{
+			CSPB_LOG_DIAG("[MODS] InstallBteMod: found match '%s', creating...", p.first);
 			g_pModRunning = p.second();
+			CSPB_LOG_DIAG("[MODS] InstallBteMod: mod created at %p", g_pModRunning);
 			return;
 		}
 	}
-	g_pModRunning = g_FindList[0].second(); // default
-	return;
+
+	CSPB_LOG_DIAG("[MODS] InstallBteMod: no match found for '%s', using default", name);
+	g_pModRunning = g_FindList[0].second();
+	CSPB_LOG_DIAG("[MODS] InstallBteMod: default mod created at %p", g_pModRunning);
 }

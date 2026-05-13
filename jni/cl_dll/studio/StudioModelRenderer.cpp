@@ -1227,8 +1227,12 @@ int CStudioModelRenderer::StudioDrawPlayer(int flags, entity_state_t *pplayer)
 		if (m_pCvarHiModels->value && m_pRenderModel != m_pCurrentEntity->model)
 			m_pCurrentEntity->curstate.body = 255;
 
-		if (!(m_pCvarDeveloper->value == 0 && gEngfuncs.GetMaxClients() == 1) && (m_pRenderModel == m_pCurrentEntity->model))
-			m_pCurrentEntity->curstate.body = 1;
+		// CSPB FIX: do not force body=1 here.
+		// CSPB uses pev->body for hand/class bodygroups, so restoring the old
+		// CS reset breaks the selected bodygroup state and diverges from the
+		// last known keep/work renderer behavior.
+		// if (!(m_pCvarDeveloper->value == 0 && gEngfuncs.GetMaxClients() == 1) && (m_pRenderModel == m_pCurrentEntity->model))
+		// 	m_pCurrentEntity->curstate.body = 1;
 
 		alight_t lighting;
 		vec3_t dir;
@@ -1288,13 +1292,18 @@ void CStudioModelRenderer::StudioCalcAttachments(void)
 {
 	int i;
 	mstudioattachment_t *pattachment;
+	int numAttachments;
 
 	if (m_pStudioHeader->numattachments > 4)
 		gEngfuncs.Con_DPrintf("Too many attachments on %s\n", m_pCurrentEntity->model->name);
 
+	numAttachments = m_pStudioHeader->numattachments;
+	if (numAttachments > MAXSTUDIOATTACHMENTS)
+		numAttachments = MAXSTUDIOATTACHMENTS;
+
 	pattachment = (mstudioattachment_t *)((byte *)m_pStudioHeader + m_pStudioHeader->attachmentindex);
 
-	for (i = 0; i < m_pStudioHeader->numattachments; i++)
+	for (i = 0; i < numAttachments; i++)
 		VectorTransform(pattachment[i].org, (*m_plighttransform)[pattachment[i].bone], m_pCurrentEntity->attachment[i]);
 }
 

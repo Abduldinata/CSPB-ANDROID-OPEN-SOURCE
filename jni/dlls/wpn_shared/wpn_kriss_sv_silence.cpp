@@ -4,6 +4,7 @@
 #include "player.h"
 #include "weapons.h"
 #include "game.h"
+#include "model_helper.h"
 #include "wpn_kriss_sv_silence.h"
 //kriss silencer
 LINK_ENTITY_TO_CLASS(weapon_kriss_sv_silence, CKriss_sv_silence)
@@ -37,7 +38,7 @@ void CKriss_sv_silence::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_GALIL;
-	SET_MODEL(ENT(pev), "models/w_scar.mdl");
+	SAFE_SET_MODEL(ENT(pev), "models/w_scar.mdl");
 
 	m_iDefaultAmmo = KRISSSILENCER_AMMO;
 
@@ -107,7 +108,7 @@ void CKriss_sv_silence::Precache(void)
 PRECACHE_MODEL("models/billflx/v_kriss_sv_silence.mdl");
 	PRECACHE_MODEL("models/p_kriss_sv_silence.mdl");
 
-	PRECACHE_MODEL("models/w_scar.mdl");
+	SAFE_PRECACHE_MODEL("models/w_scar.mdl");
 
 	PRECACHE_SOUND("weapons/kriss_sv_silence-1.wav");
 	PRECACHE_SOUND("weapons/scar_l.wav");

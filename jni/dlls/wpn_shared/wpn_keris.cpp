@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cbase.h"
 #include "player.h"
+#include "model_helper.h"
 #include "weapons.h"
 #include "wpn_keris.h"
 
@@ -26,6 +27,13 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Android-safe quarantine for the late melee precache chain:
+// - preferred view/player: v_keris / p_keris
+// - active safe pair: v_dual_knife / p_dual_knife
+// This pair finishes loading immediately before the current crash point in Android logs.
+static const char* kKerisViewModel = "models/billflx/v_dual_knife.mdl";
+static const char* kKerisPlayerModel = "models/p_dual_knife.mdl";
 
 LINK_ENTITY_TO_CLASS(weapon_keris, CKeris)
 
@@ -61,7 +69,7 @@ void CKeris::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -72,7 +80,8 @@ void CKeris::Spawn(void)
 void CKeris::Precache(void)
 {
 	
-PRECACHE_MODEL("models/billflx/v_keris.mdl");
+PRECACHE_MODEL(kKerisViewModel);
+	PRECACHE_MODEL(kKerisPlayerModel);
 
 	PRECACHE_SOUND("weapons/keris_hit_stab_1.wav");
 	PRECACHE_SOUND("weapons/knife_hit1.wav");
@@ -111,7 +120,7 @@ BOOL CKeris::Deploy(void)
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
 	m_pPlayer->m_bShieldDrawn = false;
 		
-return DefaultDeploy("models/billflx/v_keris.mdl", "models/p_keris.mdl", KNIFE_DRAW, "knife", 0);
+return DefaultDeploy(kKerisViewModel, kKerisPlayerModel, KNIFE_DRAW, "knife", 0);
 
 
 }

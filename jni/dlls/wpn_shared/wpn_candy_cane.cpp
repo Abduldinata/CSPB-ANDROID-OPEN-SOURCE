@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cbase.h"
 #include "player.h"
+#include "model_helper.h"
 #include "weapons.h"
 #include "wpn_candy_cane.h"
 
@@ -26,6 +27,14 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Future asset note:
+// - preferred player model: models/p_candy_cane.mdl
+// - temporary fallback: models/p_knife.mdl
+// Keep the preferred path for future asset restoration; the fallback is only to keep CSPB tolerant if this
+// third-person model is missing or unstable on some builds.
+static const char* kCandyCanePlayerModel = "models/p_candy_cane.mdl";
+static const char* kCandyCanePlayerFallback = "models/p_knife.mdl";
 
 LINK_ENTITY_TO_CLASS(weapon_candy_cane, CCandy_cane)
 
@@ -60,7 +69,7 @@ void CCandy_cane::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -77,7 +86,7 @@ PRECACHE_MODEL("models/billflx/v_candy_cane.mdl");
 m_iModelLeaf1 = PRECACHE_MODEL("sprites/candy_cane_effect01.spr");
 		m_iModelLeaf2 = PRECACHE_MODEL("sprites/candy_cane_effect02.spr");
 
-	PRECACHE_MODEL("models/p_candy_cane.mdl");
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kCandyCanePlayerModel, kCandyCanePlayerFallback));
 
 	PRECACHE_SOUND("weapons/knife_deploy1.wav");
 	PRECACHE_SOUND("weapons/knife_hit1.wav");
@@ -120,7 +129,7 @@ BOOL CCandy_cane::Deploy(void)
 	m_iSwing = 0;
 	
 		
-return DefaultDeploy("models/billflx/v_candy_cane.mdl", "models/p_candy_cane.mdl", KNIFE_DRAW, "kukri", 0);
+return DefaultDeploy("models/billflx/v_candy_cane.mdl", RESOLVE_MODEL_OR_FALLBACK(kCandyCanePlayerModel, kCandyCanePlayerFallback), KNIFE_DRAW, "kukri", 0);
 
 }
 

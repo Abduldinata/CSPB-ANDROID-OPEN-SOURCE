@@ -59,7 +59,7 @@ const char *sPlayerModelFiles[12] =
 	"models/player.mdl",
 	"models/player/leet/leet.mdl", // t
 	"models/player/gign/gign.mdl", // ct
-	"models/player/vip/vip.mdl", //ct
+	"models/player/gign/gign.mdl", // vip fallback for Android recovery build
 	"models/player/gsg9/gsg9.mdl", // ct
 	"models/player/guerilla/guerilla.mdl", // t
 	"models/player/arctic/arctic.mdl", // t
@@ -107,11 +107,16 @@ static int CSPB_ClampLobbyClassIndex( int classIndex )
 	return classIndex;
 }
 
-static void CSPB_RunLobbyClassAlias( const char *prefix, int classIndex )
+static void CSPB_RunLobbyClassAlias(const char *prefix, int classIndex)
 {
+	if (!prefix || !prefix[0])
+		return;
+
 	char command[64];
-	snprintf( command, sizeof( command ), "%s%d\n", prefix, CSPB_ClampLobbyClassIndex( classIndex ) );
-	gEngfuncs.pfnClientCmd( command );
+	snprintf(command, sizeof(command), "%s%d\n", prefix, CSPB_ClampLobbyClassIndex(classIndex));
+	command[sizeof(command) - 1] = '\0';
+
+	gEngfuncs.pfnClientCmd(command);
 }
 
 void __CmdFunc_PB_OpenActiveLobbyMenu()
@@ -138,12 +143,12 @@ void __CmdFunc_PB_OpenActiveLobbyMenu()
 		gEngfuncs.pfnClientCmd( command );
 	}
 
-	if ( gHUD.pb_active_mode && gHUD.pb_active_mode->string )
+	if (gHUD.pb_active_mode && gHUD.pb_active_mode->string && gHUD.pb_active_mode->string[0])
 	{
-		snprintf( command, sizeof( command ), "_db_mode_%s\n", gHUD.pb_active_mode->string );
-		gEngfuncs.pfnClientCmd( command );
+		snprintf(command, sizeof(command), "_db_mode_%s\n", gHUD.pb_active_mode->string);
+		command[sizeof(command) - 1] = '\0';
+		gEngfuncs.pfnClientCmd(command);
 	}
-
 	// 2. Run Class Alias
 	int currentTeam = 2;
 	if( gHUD.m_pbteam )
@@ -241,7 +246,7 @@ static void CSPB_PreloadLobbyUiSounds( void )
 	}
 
 	s_preloaded = true;
-	gEngfuncs.Con_Printf( "CSPB_CLIENT: preloaded lobby UI sounds\n" );
+	gEngfuncs.Con_Printf( "CSPB_ANDROID_BLANKOUT: preloaded lobby UI sounds\n" );
 }
 
 #define XASH_GENERATE_BUILDNUM
@@ -292,10 +297,17 @@ int __MsgFunc_ItemStatus( const char *name, int size, void *buf ) { return 1; }
 int __MsgFunc_ReqState( const char *name, int size, void *buf ) { return 1; }
 int __MsgFunc_ForceCam( const char *name, int size, void *buf ) { return 1; }
 int __MsgFunc_Spectator( const char *name, int size, void *buf ) { return 1; }
-int __MsgFunc_ServerName( const char *name, int size, void *buf )
+int __MsgFunc_ServerName(const char *name, int size, void *buf)
 {
-	BufferReader reader( name, buf, size );
-	strncpy( gHUD.m_szServerName, reader.ReadString(), 64 );
+	BufferReader reader(name, buf, size);
+	const char *serverName = reader.ReadString();
+
+	if (!serverName)
+		serverName = "";
+
+	strncpy(gHUD.m_szServerName, serverName, sizeof(gHUD.m_szServerName) - 1);
+	gHUD.m_szServerName[sizeof(gHUD.m_szServerName) - 1] = '\0';
+
 	return 1;
 }
 
@@ -308,7 +320,7 @@ void __CmdFunc_MouseSucksClose( void ) { evdev_open = false; }
 // This is called every time the DLL is loaded
 void CHud :: Init( void )
 {
-	gEngfuncs.Con_Printf("CSPB_CLIENT: CHud::Init start\n");
+	gEngfuncs.Con_Printf("CSPB_ANDROID_BLANKOUT: CHud::Init start\n");
 	CSPB_PreloadLobbyUiSounds();
 	HOOK_COMMAND( "special", InputCommandSpecial );
 	HOOK_COMMAND( "PB_SelectBlueClass", PB_SelectBlueClass );
@@ -339,7 +351,7 @@ void CHud :: Init( void )
 
 
 	HOOK_MESSAGE( ShadowIdx );
-	gEngfuncs.Con_Printf("CSPB_CLIENT: base HUD messages hooked\n");
+	gEngfuncs.Con_Printf("CSPB_ANDROID_BLANKOUT: base HUD messages hooked\n");
 
 	CVAR_CREATE( "_vgui_menus", "1", FCVAR_ARCHIVE | FCVAR_USERINFO );
 	CVAR_CREATE( "_cl_autowepswitch", "1", FCVAR_ARCHIVE | FCVAR_USERINFO );
@@ -712,7 +724,7 @@ if( m_flScaleRadar == 0.0f )
 			if( !m_rghSprites || !m_rgrcRects || !m_rgszSpriteNames )
 			{
 				gEngfuncs.pfnConsolePrint("CHud::VidInit(): Cannot allocate memory");
-				if( g_iXash )
+				if( g_iXash && gRenderAPI.Host_Error )
 					gRenderAPI.Host_Error("CHud::VidInit(): Cannot allocate memory");
 			}
 
@@ -722,10 +734,12 @@ if( m_flScaleRadar == 0.0f )
 				if ( p->iRes == m_iRes )
 				{
 					char sz[256];
-					sprintf(sz, "sprites/%s.spr", p->szSprite);
+					snprintf(sz, sizeof(sz), "sprites/%s.spr", p->szSprite);
 					m_rghSprites[index] = SPR_Load(sz);
 					m_rgrcRects[index] = p->rc;
-					strncpy( &m_rgszSpriteNames[index * MAX_SPRITE_NAME_LENGTH], p->szName, MAX_SPRITE_NAME_LENGTH );
+					char *dstName = &m_rgszSpriteNames[index * MAX_SPRITE_NAME_LENGTH];
+					strncpy(dstName, p->szName ? p->szName : "", MAX_SPRITE_NAME_LENGTH - 1);
+					dstName[MAX_SPRITE_NAME_LENGTH - 1] = '\0';
 
 					index++;
 				}
@@ -745,7 +759,7 @@ if( m_flScaleRadar == 0.0f )
 			if ( p->iRes == m_iRes )
 			{
 				char sz[256];
-				sprintf( sz, "sprites/%s.spr", p->szSprite );
+				snprintf(sz, sizeof(sz), "sprites/%s.spr", p->szSprite);
 				m_rghSprites[index] = SPR_Load(sz);
 				index++;
 			}
@@ -760,7 +774,7 @@ if( m_flScaleRadar == 0.0f )
 	m_HUD_round_0 = GetSpriteIndex( "round_0" );
 
 
-	if( m_HUD_number_0 == -1 && g_iXash )
+	if( m_HUD_number_0 == -1 && g_iXash && gRenderAPI.Host_Error )
 	{
 		gRenderAPI.Host_Error( "Failed to get number_0 sprite index. Check your game data!" );
 		return;
@@ -809,20 +823,26 @@ if( m_flScaleRadar == 0.0f )
 	firstinit = false;
 
 
-if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "tdm"))
-ClientCmd( "bot_all_weapons" );
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "none"))
-ClientCmd( "bot_all_weapons" );
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sg"))
-ClientCmd( "bot_sg_only" );
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "knife"))
-ClientCmd( "bot_knives_only" );
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sniper"))
-ClientCmd( "bot_snipers_only" );
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sgb"))
-ClientCmd( "bot_sg_only" );
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sniperb"))
-ClientCmd( "bot_snipers_only" );
+	const char *gameMode = CVAR_GET_STRING("mp_gamemode");
+
+	if (!gameMode)
+		gameMode = "";
+
+	if (!strcmp(gameMode, "tdm"))
+		ClientCmd("bot_all_weapons");
+	else if (!strcmp(gameMode, "none"))
+		ClientCmd("bot_all_weapons");
+	else if (!strcmp(gameMode, "sg"))
+		ClientCmd("bot_sg_only");
+	else if (!strcmp(gameMode, "knife"))
+		ClientCmd("bot_knives_only");
+	else if (!strcmp(gameMode, "sniper"))
+		ClientCmd("bot_snipers_only");
+	else if (!strcmp(gameMode, "sgb"))
+		ClientCmd("bot_sg_only");
+	else if (!strcmp(gameMode, "sniperb"))
+		ClientCmd("bot_snipers_only");
+
 }
 
 void CHud::Shutdown( void )
@@ -849,42 +869,39 @@ COM_FileBase
 ============
 */
 // Extracts the base name of a file (no path, no extension, assumes '/' as path separator)
-void COM_FileBase ( const char *in, char *out)
+void COM_FileBase(const char *in, char *out)
 {
-	int len, start, end;
+	if (!out)
+		return;
 
-	len = strlen( in );
-	
-	// scan backward for '.'
-	end = len - 1;
-	while ( end && in[end] != '.' && in[end] != '/' && in[end] != '\\' )
-		end--;
-	
-	if ( in[end] != '.' )		// no '.', copy to end
-		end = len-1;
+	out[0] = '\0';
+
+	if (!in || !in[0])
+		return;
+
+	const char *start = strrchr(in, '/');
+	const char *start2 = strrchr(in, '\\');
+
+	if (!start || (start2 && start2 > start))
+		start = start2;
+
+	start = start ? start + 1 : in;
+
+	const char *end = strrchr(start, '.');
+
+	size_t len;
+	if (end && end > start)
+		len = (size_t)(end - start);
 	else
-		end--;					// Found ',', copy to left of '.'
+		len = strlen(start);
 
+	// HUD_IsGame uses char gd[1024], so cap safely.
+	if (len > 1023)
+		len = 1023;
 
-	// Scan backward for '/'
-	start = len-1;
-	while ( start >= 0 && in[start] != '/' && in[start] != '\\' )
-		start--;
-
-	if ( in[start] != '/' && in[start] != '\\' )
-		start = 0;
-	else
-		start++;
-
-	// Length of new sting
-	len = end - start + 1;
-
-	// Copy partial string
-	strncpy( out, &in[start], len );
-	// Terminate it
-	out[len] = 0;
+	strncpy(out, start, len);
+	out[len] = '\0';
 }
-
 /*
 =================
 HUD_IsGame
@@ -1026,46 +1043,48 @@ void CHudDamagePb::UserCmd_CommandActive(void)
 
 int CHudDamagePb::VidInit()
 {
-
-m_damage_tex = gRenderAPI.GL_LoadTexture("gfx/billflx/damage.png", NULL, 0, TF_NEAREST |TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP );
-return 1;
+	if( R_CanLoadTexture() )
+		m_damage_tex = gRenderAPI.GL_LoadTexture("gfx/billflx/damage.png", NULL, 0, TF_NEAREST|TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP);
+	else
+		m_damage_tex = 0;
+	return 1;
 }
 
 int CHudDamagePb::Draw( float flTime )
 {
-int alphaBalance;
+	int alphaBalance;
 	int alphaStatic;
 
 	m_fFade -= gHUD.m_flTimeDelta;
-	if( m_fFade <= 0)
+	if( m_fFade <= 0 )
 	{
 		m_fFade = 0.0f;
 		return 1;
 	}
-	
+
 	float interpolate2 = ( 2 - m_fFade ) / 2;
 	alphaBalance = 255 - interpolate2 * 255;
-	//
-	
- 
-	
-	if(alphaBalance < 255)
-    alphaStatic = alphaBalance;
-    else
-    alphaStatic = 255;
 
-//
-gRenderAPI.GL_SelectTexture( 0 );
-gRenderAPI.GL_Bind(0, m_damage_tex);
-gEngfuncs.pTriAPI->Color4ub(255, 255, 255, alphaStatic);
+	if( alphaBalance < 255 )
+		alphaStatic = alphaBalance;
+	else
+		alphaStatic = 255;
 
-gEngfuncs.pTriAPI->RenderMode(kRenderTransTexture);
-DrawUtils::Draw2DQuad( (INT_XPOS(0) + 0) * gHUD.m_flScale, (INT_YPOS(0) * 0) * gHUD.m_flScale,(INT_XPOS(15.8) + 0 + gHUD.GetCharHeight() ) * gHUD.m_flScale,(INT_YPOS(22) * 0.5 + gHUD.GetCharHeight() ) * gHUD.m_flScale );
-gEngfuncs.pTriAPI->RenderMode(kRenderNormal);
-
-return 1;
+	if( R_CanBindTexture() && m_damage_tex )
+	{
+		gRenderAPI.GL_SelectTexture( 0 );
+		gRenderAPI.GL_Bind( 0, m_damage_tex );
+		gEngfuncs.pTriAPI->Color4ub( 255, 255, 255, alphaStatic );
+		gEngfuncs.pTriAPI->RenderMode( kRenderTransTexture );
+		DrawUtils::Draw2DQuad(
+			(INT_XPOS(0) + 0) * gHUD.m_flScale,
+			(INT_YPOS(0) * 0) * gHUD.m_flScale,
+			(INT_XPOS(15.8) + 0 + gHUD.GetCharHeight()) * gHUD.m_flScale,
+			(INT_YPOS(22) * 0.5 + gHUD.GetCharHeight()) * gHUD.m_flScale );
+		gEngfuncs.pTriAPI->RenderMode( kRenderNormal );
+	}
+	return 1;
 }
-
 
 
 
@@ -1103,46 +1122,48 @@ HOOK_COMMAND("DeathScreen", CommandActiveDeathScreen);
 
 int CHudDeathScreen::VidInit()
 {
-
-m_death_tex = gRenderAPI.GL_LoadTexture("gfx/billflx/bloody_screen.png", NULL, 0, TF_NEAREST |TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP );
-return 1;
+	if( R_CanLoadTexture() )
+		m_death_tex = gRenderAPI.GL_LoadTexture("gfx/billflx/bloody_screen.png", NULL, 0, TF_NEAREST|TF_NOPICMIP|TF_NOMIPMAP|TF_CLAMP);
+	else
+		m_death_tex = 0;
+	return 1;
 }
 
 int CHudDeathScreen::Draw( float flTime )
 {
-
-int alphaBalance;
+	int alphaBalance;
 	int alphaStatic;
 
 	m_fFade -= gHUD.m_flTimeDelta;
-	if( m_fFade <= 0)
+	if( m_fFade <= 0 )
 	{
 		m_fFade = 0.0f;
 		return 1;
 	}
-	
+
 	float interpolate2 = ( 2 - m_fFade ) / 2;
 	alphaBalance = 255 - interpolate2 * 255;
-	//
-	
- 
-	
-	if(alphaBalance < 255)
-    alphaStatic = alphaBalance;
-    else
-    alphaStatic = 255;
 
-//
-gRenderAPI.GL_SelectTexture( 0 );
-gRenderAPI.GL_Bind(0, m_death_tex);
-gEngfuncs.pTriAPI->Color4ub(255, 255, 255, alphaStatic);
-gEngfuncs.pTriAPI->RenderMode(kRenderTransTexture);
-DrawUtils::Draw2DQuad( (INT_XPOS(0) + 0) * gHUD.m_flScale, (INT_YPOS(0) * 0) * gHUD.m_flScale,(INT_XPOS(15.8) + 0 + gHUD.GetCharHeight() ) * gHUD.m_flScale,(INT_YPOS(22) * 0.5 + gHUD.GetCharHeight() ) * gHUD.m_flScale );
-gEngfuncs.pTriAPI->RenderMode(kRenderNormal);
+	if( alphaBalance < 255 )
+		alphaStatic = alphaBalance;
+	else
+		alphaStatic = 255;
 
-return 1;
+	if( R_CanBindTexture() && m_death_tex )
+	{
+		gRenderAPI.GL_SelectTexture( 0 );
+		gRenderAPI.GL_Bind( 0, m_death_tex );
+		gEngfuncs.pTriAPI->Color4ub( 255, 255, 255, alphaStatic );
+		gEngfuncs.pTriAPI->RenderMode( kRenderTransTexture );
+		DrawUtils::Draw2DQuad(
+			(INT_XPOS(0) + 0) * gHUD.m_flScale,
+			(INT_YPOS(0) * 0) * gHUD.m_flScale,
+			(INT_XPOS(15.8) + 0 + gHUD.GetCharHeight()) * gHUD.m_flScale,
+			(INT_YPOS(22) * 0.5 + gHUD.GetCharHeight()) * gHUD.m_flScale );
+		gEngfuncs.pTriAPI->RenderMode( kRenderNormal );
+	}
+	return 1;
 }
-
 
 const char *iSec[] = {
 "pbbuy weapon_colt_python",//0
@@ -1467,10 +1488,14 @@ static const std::vector<std::string> &GetPrimaryListForGamemode(void)
 	}
 
 	const char *gm = CVAR_GET_STRING("mp_gamemode");
+	if (!gm)
+		gm = "";
+
 	if (!strcmp(gm, "sg") || !strcmp(gm, "sgb"))
 		return g_PrimShotgun;
-	if (!strcmp(gm, "sniper") || !strcmp(gm, "sniperB"))
+	if (!strcmp(gm, "sniper") || !strcmp(gm, "sniperB") || !strcmp(gm, "sniperb"))
 		return g_PrimSniper;
+
 	return g_PrimAll;
 }
 
@@ -1533,22 +1558,26 @@ ClientCmd("billflxcrypted_quickreload");
 
 void CHudInventoryGive::UserCmd_CommandActiveMode_ui(void)
 {
-if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "tdm"))
-ClientCmd("exec inv/inv_tdm; bot_all_weapons");
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "none"))
-ClientCmd("exec inv/inv_tdm; bot_all_weapons");
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sg"))
-ClientCmd("exec inv/inv_sg_tdm; bot_sg_only");
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "knife"))
-ClientCmd("exec inv/inv_knife_tdm; bot_knives_only");
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sniper"))
-ClientCmd("exec inv/inv_sniper_tdm; bot_snipers_only");
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sgb"))
-ClientCmd("exec inv/inv_sg_bomb; bot_sg_only");
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "sniperb"))
-ClientCmd("exec inv/inv_sniper_bomb; bot_snipers_only");
-else if (!strcmp(CVAR_GET_STRING("mp_gamemode"), "knifeB"))
-ClientCmd("exec inv/inv_knife_bomb; bot_knives_only");
+	const char *gameMode = CVAR_GET_STRING("mp_gamemode");
+	if (!gameMode)
+		gameMode = "";
+
+	if (!strcmp(gameMode, "tdm"))
+		ClientCmd("exec inv/inv_tdm; bot_all_weapons");
+	else if (!strcmp(gameMode, "none"))
+		ClientCmd("exec inv/inv_tdm; bot_all_weapons");
+	else if (!strcmp(gameMode, "sg"))
+		ClientCmd("exec inv/inv_sg_tdm; bot_sg_only");
+	else if (!strcmp(gameMode, "knife"))
+		ClientCmd("exec inv/inv_knife_tdm; bot_knives_only");
+	else if (!strcmp(gameMode, "sniper"))
+		ClientCmd("exec inv/inv_sniper_tdm; bot_snipers_only");
+	else if (!strcmp(gameMode, "sgb"))
+		ClientCmd("exec inv/inv_sg_bomb; bot_sg_only");
+	else if (!strcmp(gameMode, "sniperb"))
+		ClientCmd("exec inv/inv_sniper_bomb; bot_snipers_only");
+	else if (!strcmp(gameMode, "knifeB") || !strcmp(gameMode, "knifeb"))
+		ClientCmd("exec inv/inv_knife_bomb; bot_knives_only");
 }
 
 void CHudInventoryGive::UserCmd_CommandActiveInventoryGive(void) //on spawn

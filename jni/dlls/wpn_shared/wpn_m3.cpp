@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "game.h"
 #include "wpn_m3.h"
 
@@ -44,7 +45,7 @@ void CM3::Spawn(void)
 
 	Precache();
 	m_iId = WEAPON_M3;
-	SET_MODEL(ENT(pev), "models/w_870mcs.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_FIREARM_WORLD_MODEL("models/w_870mcs.mdl"));
 	m_iDefaultAmmo = M3_DEFAULT_GIVE;
 
 	FallInit();

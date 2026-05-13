@@ -7,6 +7,7 @@
 #include "client.h"
 #include "trains.h"
 #include "vehicle.h"
+#include "model_helper.h"
 #include "nodes.h"
 #include "weapons.h"
 #include "soundent.h"
@@ -7155,7 +7156,7 @@ void CBasePlayer::DropPlayerItem(const char *pszItemName)
 
 			if (modelname != NULL)
 			{
-				SET_MODEL(ENT(pWeaponBox->pev), modelname);
+				SAFE_SET_MODEL(ENT(pWeaponBox->pev), modelname);
 			}
 
 			return;

@@ -448,8 +448,11 @@ void ReadMultiplayCvars(CHalfLifeMultiplay *mp)
 
 CHalfLifeMultiplay::CHalfLifeMultiplay()
 {
+	CSPB_LOG_DIAG("[GRULES] CHalfLifeMultiplay ctor start");
 	m_VoiceGameMgr.Init(&g_GameMgrHelper, gpGlobals->maxClients);
+	CSPB_LOG_DIAG("[GRULES] after voice init");
 	RefreshSkillData();
+	CSPB_LOG_DIAG("[GRULES] after RefreshSkillData");
 
 	m_flIntermissionEndTime = 0;
 	m_flIntermissionStartTime = 0;
@@ -496,6 +499,8 @@ CHalfLifeMultiplay::CHalfLifeMultiplay()
 	g_iHostageNumber = 0;
 	m_bBombDropped = FALSE;
 
+	CSPB_LOG_DIAG("[GRULES] after member init block");
+
 	m_iMaxRounds = (int)CVAR_GET_FLOAT("mp_maxrounds");
 
 	if (m_iMaxRounds < 0)
@@ -527,8 +532,10 @@ CHalfLifeMultiplay::CHalfLifeMultiplay()
 		VIPQueue[j] = NULL;
 	}
 
+	CSPB_LOG_DIAG("[GRULES] before ReadMultiplayCvars");
 	CVAR_SET_FLOAT("cl_himodels", 0);
 	ReadMultiplayCvars(this);
+	CSPB_LOG_DIAG("[GRULES] after ReadMultiplayCvars");
 
 	m_iIntroRoundTime += 2;
 	m_fMaxIdlePeriod = m_iRoundTime * 2;
@@ -543,6 +550,7 @@ CHalfLifeMultiplay::CHalfLifeMultiplay()
 	m_bInCareerGame = false;
 	m_iRoundTimeSecs = m_iIntroRoundTime;
 
+	CSPB_LOG_DIAG("[GRULES] before career/listen check");
 	if (IS_DEDICATED_SERVER())
 	{
 		CVAR_SET_FLOAT("pausable", 0);
@@ -569,19 +577,24 @@ CHalfLifeMultiplay::CHalfLifeMultiplay()
 			ALERT(at_console, "Executing listen server config file\n");
 
 			char szCommand[256];
-			Q_sprintf(szCommand, "exec %s\n", lservercfgfile);
+			Q_snprintf(szCommand, sizeof(szCommand), "exec %s\n", lservercfgfile);
 			SERVER_COMMAND(szCommand);
 		}
 	}
 
+	CSPB_LOG_DIAG("[GRULES] after career/listen check");
 	m_fRoundCount = 0;
 	m_fIntroRoundCount = 0;
 
 #ifndef CSTRIKE
+	CSPB_LOG_DIAG("[GRULES] before InstallBotControl");
 	InstallBotControl();
+	CSPB_LOG_DIAG("[GRULES] after InstallBotControl");
 #endif // CSTRIKE
 
+	CSPB_LOG_DIAG("[GRULES] before InstallHostageManager");
 	InstallHostageManager();
+	CSPB_LOG_DIAG("[GRULES] after InstallHostageManager");
 
 	m_bSkipSpawn = m_bInCareerGame;
 
@@ -609,7 +622,9 @@ CHalfLifeMultiplay::CHalfLifeMultiplay()
 	m_iCareerMatchWins = 0;
 
 	m_iRoundWinDifference = (int)CVAR_GET_FLOAT("mp_windifference");
+	CSPB_LOG_DIAG("[GRULES] before CCareerTaskManager");
 	CCareerTaskManager::Create();
+	CSPB_LOG_DIAG("[GRULES] after CCareerTaskManager");
 
 	if (m_iRoundWinDifference < 1)
 	{
@@ -3896,6 +3911,12 @@ pKiller->frags += IPointsForKill(peKiller, pVictim);
 			}
 		}
 	}
+	// LEGACY STAR/STREAK FLOW BELOW:
+	// This block predates the modular V20 kill-effect flow above and sends an extra
+	// wave of star-position messages (KillStar*, HeadshotStar*, StopperStar*, Pos2, etc).
+	// Current client kill_effect.cpp only consumes the modular announcements/fraganim
+	// messages, so this legacy branch is not synchronized with the modern HUD path and
+	// can duplicate or override events from the block above.
 if(pVictim->round_frags_sniper >= 4)
 {
 MESSAGE_BEGIN(MSG_ONE, gmsgFragAnimStopper, NULL, pKiller);
@@ -5298,6 +5319,10 @@ MESSAGE_BEGIN(MSG_ONE, gmsgKillStar10, NULL, pKiller); MESSAGE_END();
 }
 
 
+// LEGACY POINT/HEADSHOT FLOW:
+// This section uses round_frags/round_frags_headshot as a second scoring/announcement
+// pipeline after the modular block above already touched the same counters. Keep this
+// marked as legacy until server kill logic is consolidated into a single source of truth.
 //headshot 
 if (pVictim->m_bHeadshotKilled)
 {

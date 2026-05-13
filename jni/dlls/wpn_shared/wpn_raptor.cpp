@@ -18,6 +18,7 @@
 #include "cbase.h"
 #include "player.h"
 #include "weapons.h"
+#include "model_helper.h"
 #include "wpn_raptor.h"
 
 #ifndef CLIENT_DLL
@@ -26,6 +27,10 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Android-safe quarantine for unverified dinosaur melee assets.
+static const char* kRaptorViewModel = "models/billflx/v_dual_knife.mdl";
+static const char* kRaptorPlayerModel = "models/p_dual_knife.mdl";
 
 LINK_ENTITY_TO_CLASS(raptor, Craptor)
 
@@ -56,7 +61,7 @@ void Craptor::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -66,13 +71,13 @@ void Craptor::Spawn(void)
 
 void Craptor::Precache(void)
 {
-	PRECACHE_MODEL("models/billflx/dino/v_raptor.mdl");
+	PRECACHE_MODEL(kRaptorViewModel);
 
 
 #ifdef ENABLE_SHIELD
 	PRECACHE_MODEL("models/shield/v_shield_knife.mdl");
 #endif
-	PRECACHE_MODEL("models/w_knife.mdl");
+	PRECACHE_MODEL(RESOLVE_CSPB_MELEE_WORLD_MODEL("models/w_knife.mdl"));
 
 	PRECACHE_SOUND("weapons/knife_draw.wav");
 	PRECACHE_SOUND("weapons/knife_hit1.wav");
@@ -113,7 +118,7 @@ EMIT_SOUND(ENT(m_pPlayer->pev), CHAN_ITEM, "weapons/knife_draw.wav", 0.3, 2.4);
 	m_fMaxSpeed = 250;
 	m_iSwing = 0;
 		
-return DefaultDeploy("models/billflx/dino/v_raptor.mdl", NULL, KNIFE_DRAW, "knife", UseDecrement() != FALSE);
+return DefaultDeploy(kRaptorViewModel, kRaptorPlayerModel, KNIFE_DRAW, "knife", UseDecrement() != FALSE);
 
 }
 

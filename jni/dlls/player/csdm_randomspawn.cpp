@@ -90,12 +90,16 @@ void CSDM_LoadSpawnPoints()
 	g_vecSpawnCSDM.clear();
 	// Check for CSDM spawns of the current map
 	char filename[256];
-	Q_sprintf(filename, "addons/amxmodx/configs/csdm/%s.spawns.cfg", STRING(gpGlobals->mapname));
+	Q_snprintf(filename, sizeof(filename), "addons/amxmodx/configs/csdm/%s.spawns.cfg", STRING(gpGlobals->mapname));
+	CSPB_LOG_DIAG("[CSDM] load start map=%s file=%s", STRING(gpGlobals->mapname), filename);
 
 	SteamFile csdmFile(filename);
 
 	if (!csdmFile.IsValid())
+	{
+		CSPB_LOG_DIAG("[CSDM] file missing, using map default spawns");
 		return;
+	}
 
 	auto readline = [](SteamFile &sf) {
 		std::string ret;
@@ -110,6 +114,7 @@ void CSDM_LoadSpawnPoints()
 	};
 
 	std::pair<bool, std::string> linedata;
+	int lineCount = 0;
 	while ((linedata = readline(csdmFile)).first)
 	{
 		std::array<float, 9> arr;
@@ -120,7 +125,10 @@ void CSDM_LoadSpawnPoints()
 				ss>>arr[i];
 		}
 		g_vecSpawnCSDM.emplace_back(MakeSpawnPointData(arr));
+		++lineCount;
 	}
+
+	CSPB_LOG_DIAG("[CSDM] load done count=%d", lineCount);
 }
 
 /*

@@ -136,6 +136,12 @@ extern int gmsgFragAnimStopperHs;
 extern int gmsgFragAnimBlue;
 extern int gmsgFragAnimGold;
 
+// CSPB V20 modular kill-effect notifications
+extern int gmsgSpecialGunner;
+extern int gmsgBombShot;
+extern int gmsgoneShot;
+extern int gmsgMassKill;
+
 extern int		gmsgRoundFrags;
 extern int		gmsgRoundFrags_headshot;
 extern int		gmsgRoundFrags_grenade;

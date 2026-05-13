@@ -28,7 +28,7 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := client
+LOCAL_MODULE := cspb_client_android_arm64
 
 include $(XASH3D_CONFIG)
 
@@ -38,8 +38,10 @@ endif
 
 LOCAL_CFLAGS += -fsigned-char -DCLIENT_DLL=1 -DCLIENT_WEAPONS=1 -D_LINUX
 LOCAL_CFLAGS += -Dstricmp=strcasecmp -D_strnicmp=strncasecmp -Dstrnicmp=strncasecmp 
+LOCAL_CFLAGS += -Wno-error
 LOCAL_CONLYFLAGS += -std=c99
-LOCAL_CPPFLAGS += -std=c++11
+LOCAL_CPPFLAGS += -std=c++11 -Wno-error -Wno-inconsistent-missing-override
+
 
 LOCAL_C_INCLUDES := $(LOCAL_PATH) \
 	$(LOCAL_PATH) \

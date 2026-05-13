@@ -57,6 +57,7 @@
 #include "gamerules.h"
 #include "career_tasks.h"
 #include "maprules.h"
+#include <sys/stat.h>
 
 /*
 * Globals initialization
@@ -64,6 +65,59 @@
 BotPhraseManager *TheBotPhrases = NULL;
 CountdownTimer BotChatterInterface::m_encourageTimer;
 IntervalTimer BotChatterInterface::m_radioSilenceInterval[ 2 ];
+
+static bool BotChatterFileExists(const char *path)
+{
+	struct stat buffer;
+	return stat(path, &buffer) == 0;
+}
+
+static void LogBotRadioFallback(const char *sourcePhrase, const char *resolvedPhrase)
+{
+	static int s_botRadioFallbackLogCount = 0;
+	static bool s_botRadioFallbackSuppressedNoticeShown = false;
+	const int kMaxDetailedBotRadioFallbackLogs = 12;
+
+	if (s_botRadioFallbackLogCount < kMaxDetailedBotRadioFallbackLogs)
+	{
+		ALERT(at_console, "CSPB_BOT_RADIO_FALLBACK: remapped %s -> %s\n", sourcePhrase, resolvedPhrase);
+		++s_botRadioFallbackLogCount;
+		return;
+	}
+
+	if (!s_botRadioFallbackSuppressedNoticeShown)
+	{
+		ALERT(at_console, "CSPB_BOT_RADIO_FALLBACK: additional remap logs suppressed after %d entries\n", kMaxDetailedBotRadioFallbackLogs);
+		s_botRadioFallbackSuppressedNoticeShown = true;
+	}
+}
+
+static void ResolveBotChatterPhrasePath(const char *sourcePhrase, char *resolvedPhrase, size_t resolvedLen)
+{
+	char soundPath[256];
+	Q_snprintf(soundPath, sizeof(soundPath), "sound\\%s", sourcePhrase);
+
+	if (BotChatterFileExists(soundPath))
+	{
+		Q_snprintf(resolvedPhrase, resolvedLen, "%s", sourcePhrase);
+		return;
+	}
+
+	if (!Q_strnicmp(sourcePhrase, "radio\\bot\\", 10))
+	{
+		const char *botFilename = sourcePhrase + 10;
+		Q_snprintf(soundPath, sizeof(soundPath), "sound\\radio\\%s", botFilename);
+		if (BotChatterFileExists(soundPath))
+		{
+			Q_snprintf(resolvedPhrase, resolvedLen, "radio\\%s", botFilename);
+			LogBotRadioFallback(sourcePhrase, resolvedPhrase);
+			return;
+		}
+	}
+
+	Q_snprintf(resolvedPhrase, resolvedLen, "radio\\null.wav");
+	LogBotRadioFallback(sourcePhrase, resolvedPhrase);
+}
 
 const Vector *GetRandomSpotAtPlace(Place place)
 {
@@ -646,14 +700,17 @@ bool BotPhraseManager::Initialize(const char *filename, int bankIndex)
 
 				// found a phrase - add it to the collection
 				BotSpeakable *speak = new BotSpeakable;
+				char resolvedPhrase[RadioPathLen];
 				if (baseDir[0])
 				{
 					Q_snprintf(compositeFilename, RadioPathLen, "%s%s", baseDir, token);
-					speak->m_phrase = CloneString(compositeFilename);
+					ResolveBotChatterPhrasePath(compositeFilename, resolvedPhrase, sizeof(resolvedPhrase));
+					speak->m_phrase = CloneString(resolvedPhrase);
 				}
 				else
 				{
-					speak->m_phrase = CloneString(token);
+					ResolveBotChatterPhrasePath(token, resolvedPhrase, sizeof(resolvedPhrase));
+					speak->m_phrase = CloneString(resolvedPhrase);
 				}
 
 				speak->m_place = placeCriteria;

@@ -17,6 +17,7 @@
 #include "util.h"
 #include "cbase.h"
 #include "player.h"
+#include "model_helper.h"
 #include "weapons.h"
 #include "wpn_butterfly.h"
 
@@ -26,6 +27,19 @@
 
 #define KNIFE_BODYHIT_VOLUME 128
 #define KNIFE_WALLHIT_VOLUME 512
+
+// Future asset note:
+// - preferred world model: models/w_butterfly.mdl
+// - temporary CSPB fallback: models/w_miniaxe.mdl
+// When the dedicated W model exists, keep the first path and change/remove the fallback.
+static const char* kButterflyWorldModel = "models/w_butterfly.mdl";
+static const char* kButterflyWorldFallback = "models/w_miniaxe.mdl";
+
+// Android-safe quarantine for the late melee precache chain:
+// - preferred view/player: v_butterfly / p_butterfly
+// - active safe pair: v_dual_knife / p_dual_knife
+static const char* kButterflyViewModel = "models/billflx/v_dual_knife.mdl";
+static const char* kButterflyPlayerModel = "models/p_dual_knife.mdl";
 
 LINK_ENTITY_TO_CLASS(weapon_butterfly, Cbutterfly)
 
@@ -57,7 +71,7 @@ void Cbutterfly::Spawn(void)
 {
 	Precache();
 	m_iId = WEAPON_KNIFE;
-	SET_MODEL(ENT(pev), "models/w_knife.mdl");
+	SET_MODEL(ENT(pev), RESOLVE_MODEL_OR_FALLBACK(kButterflyWorldModel, kButterflyWorldFallback));
 
 	m_iClip = WEAPON_NOCLIP;
 	m_iWeaponState &= ~WPNSTATE_SHIELD_DRAWN;
@@ -67,12 +81,13 @@ void Cbutterfly::Spawn(void)
 
 void Cbutterfly::Precache(void)
 {
-PRECACHE_MODEL("models/billflx/v_butterfly.mdl");
+PRECACHE_MODEL(kButterflyViewModel);
 
 #ifdef ENABLE_SHIELD
 	PRECACHE_MODEL("models/shield/v_shield_knife.mdl");
 #endif
-	PRECACHE_MODEL("models/w_butterfly.mdl");
+	PRECACHE_MODEL(RESOLVE_MODEL_OR_FALLBACK(kButterflyWorldModel, kButterflyWorldFallback));
+	PRECACHE_MODEL(kButterflyPlayerModel);
 
 	PRECACHE_SOUND("weapons/keris_draw.wav");
 	PRECACHE_SOUND("weapons/knife_hit1.wav");
@@ -111,7 +126,7 @@ BOOL Cbutterfly::Deploy(void)
 	m_iSwing = 0;
 	
 
-if ( DefaultDeploy("models/billflx/v_butterfly.mdl", "models/p_butterfly.mdl", KNIFE_DRAW, "knife", 0));
+if ( DefaultDeploy(kButterflyViewModel, kButterflyPlayerModel, KNIFE_DRAW, "knife", 0));
 
 {
 	m_flNextPrimaryAttack = m_pPlayer->m_flNextAttack = UTIL_WeaponTimeBase() + 0.6;

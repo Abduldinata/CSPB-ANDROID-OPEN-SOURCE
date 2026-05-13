@@ -363,6 +363,7 @@ void CBreakable::MaterialSoundRandom(edict_t *pEdict, Materials soundMaterial, f
 void CBreakable::Precache()
 {
 	const char *pGibName = NULL;
+	static qboolean s_reportedMissingGlassGibs = FALSE;
 
 	switch (m_Material)
 	{
@@ -429,7 +430,20 @@ void CBreakable::Precache()
 
 	if (pGibName != NULL)
 	{
-		m_idShard = PRECACHE_MODEL((char *)pGibName);
+		if (FStrEq(pGibName, "models/glassgibs.mdl") && !UTIL_FileExists(pGibName))
+		{
+			m_idShard = 0;
+
+			if (!s_reportedMissingGlassGibs)
+			{
+				CSPB_LOG_DIAG("[PRECACHE] Android recovery: glassgibs missing, suppressing repeated breakable shard precache");
+				s_reportedMissingGlassGibs = TRUE;
+			}
+		}
+		else
+		{
+			m_idShard = PRECACHE_MODEL((char *)pGibName);
+		}
 	}
 
 	// Precache the spawn item's data
